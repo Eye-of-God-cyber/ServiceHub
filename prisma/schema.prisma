@@ -1,0 +1,1254 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ServiceHub — Prisma Database Schema
+// Version: 1.0.0
+// Database: PostgreSQL
+//
+// Architecture Notes:
+//   • All monetary values use Decimal(10,2) for exact arithmetic.
+//   • All IDs for User are UUID strings (prevents enumeration attacks).
+//   • All other IDs are auto-increment integers (lighter joins, simpler FKs).
+//   • Immutable audit tables (BookingStatusHistory, WalletTransaction) have no
+//     updatedAt field — records must never be modified after creation.
+//   • Snake_case is used for all DB column/table names via @map / @@map.
+//     Prisma model names remain PascalCase (JS convention).
+//   • Cascade behaviors are explicitly chosen:
+//       Cascade  → child data has no meaning without parent (e.g., profile → user)
+//       Restrict → protect financial/audit records from accidental parent deletion
+//       SetNull  → preserve audit trail even when the actor user no longer exists
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ENUMS
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── User & Auth ───────────────────────────────────────────────────────────────
+
+/// Lifecycle status for every user account in the system.
+/// ACTIVE: normal access | INACTIVE: self-deactivated | SUSPENDED: temp ban by admin | BANNED: permanent
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  BANNED
+}
+
+/// The three roles that exist in the system.
+/// A user can hold multiple roles (e.g., someone who is both a CUSTOMER and a PROVIDER).
+enum RoleName {
+  CUSTOMER
+  PROVIDER
+  ADMIN
+}
+
+/// Purpose of an OTP code. Drives validation rules and expiry handling in the service layer.
+enum OtpPurpose {
+  EMAIL_VERIFICATION
+  PHONE_VERIFICATION
+  PASSWORD_RESET
+}
+
+// ── Provider ──────────────────────────────────────────────────────────────────
+
+/// Admin's decision on a provider's profile or uploaded document.
+/// PENDING: awaiting review | UNDER_REVIEW: actively being reviewed | APPROVED / REJECTED: final decisions
+enum VerificationStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+/// Categories of documents a provider can upload during onboarding.
+enum DocumentType {
+  ID_PROOF
+  ADDRESS_PROOF
+  CERTIFICATION
+  POLICE_VERIFICATION
+  OTHER
+}
+
+/// Days of the week for provider recurring availability schedules.
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+// ── Booking ───────────────────────────────────────────────────────────────────
+
+/// The full lifecycle of a booking, modelled as a state machine.
+/// Valid transitions are enforced in the service layer, not the database.
+///   PENDING → CONFIRMED → IN_PROGRESS → COMPLETED
+///   PENDING → CANCELLED
+///   CONFIRMED → CANCELLED
+///   IN_PROGRESS → NO_SHOW (provider or customer didn't show)
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+// ── Payment & Wallet ──────────────────────────────────────────────────────────
+
+/// Payment gateway result for a single payment attempt.
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+/// The channel through which a payment was made.
+enum PaymentMethod {
+  WALLET
+  CARD
+  UPI
+  CASH
+  NET_BANKING
+}
+
+/// Direction of money flow in a wallet ledger entry.
+enum WalletTransactionType {
+  CREDIT
+  DEBIT
+}
+
+/// Processing state of a wallet transaction.
+/// PENDING: initiated but not settled | COMPLETED: settled | FAILED: declined | REVERSED: rolled back
+enum WalletTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+// ── Disputes ──────────────────────────────────────────────────────────────────
+
+/// Lifecycle of a dispute ticket.
+enum DisputeStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+/// Drives the notification icon, color, and deep-link behavior in the client app.
+enum NotificationType {
+  BOOKING_UPDATE
+  PAYMENT
+  REVIEW_REQUEST
+  PROMOTIONAL
+  SYSTEM
+  DISPUTE
+}
+
+// ── Coupons ───────────────────────────────────────────────────────────────────
+
+/// PERCENTAGE: discount is a percentage of order value (e.g., 20% off).
+/// FLAT: fixed amount deducted from order total (e.g., ₹100 off).
+enum CouponType {
+  PERCENTAGE
+  FLAT
+}
+
+/// Operational status of a coupon code.
+enum CouponStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// MODELS
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: roles
+//
+// Why it exists:
+//   Stores the master list of roles in the system. Keeping roles in a dedicated
+//   table (rather than hardcoding them in the user table) allows for future
+//   role additions without schema changes. The actual assignment of roles to
+//   users lives in the user_roles junction table.
+//
+// Relationships:
+//   • roles (1:N) → user_roles
+// ─────────────────────────────────────────────────────────────────────────────
+model Role {
+  /// Auto-increment PK — roles are rarely referenced externally, so int is sufficient.
+  id   Int      @id @default(autoincrement())
+  /// Enum-typed to prevent arbitrary role strings from being inserted.
+  name RoleName @unique
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Back-references
+  userRoles UserRole[]
+
+  @@map("roles")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: users
+//
+// Why it exists:
+//   The single authentication identity table. Every person in the system
+//   (customer, provider, admin) has exactly one row here. Role-specific
+//   data lives in user_profiles or provider_profiles. This separation
+//   keeps authentication logic clean and role-specific queries isolated.
+//
+// Fields:
+//   • id            UUID string — prevents sequential ID enumeration attacks.
+//   • email         Unique — used as the login identifier.
+//   • phone         Unique — used for OTP-based authentication flows.
+//   • passwordHash  Bcrypt hash — never stored in plaintext.
+//   • status        Controls login access without deleting the record.
+//   • isVerified    True once the user completes email or phone verification.
+//
+// Relationships:
+//   • users (1:1) → user_profiles
+//   • users (1:1) → provider_profiles
+//   • users (1:1) → wallets
+//   • users (1:N) → user_roles
+//   • users (1:N) → addresses
+//   • users (1:N) → bookings [as customer]
+//   • users (1:N) → reviews [as customer who wrote them]
+//   • users (1:N) → disputes [as the party who raised them]
+//   • users (1:N) → dispute_messages [as sender]
+//   • users (1:N) → notifications
+//   • users (1:N) → coupon_usages
+//   • users (1:N) → otp_verifications
+//   • users (1:N) → booking_status_history [nullable — as the actor who changed status]
+// ─────────────────────────────────────────────────────────────────────────────
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  phone        String     @unique
+  /// Bcrypt-hashed password. Never expose this field in API responses.
+  passwordHash String     @map("password_hash")
+  status       UserStatus @default(ACTIVE)
+  /// True once the user completes OTP email or phone verification.
+  isVerified   Boolean    @default(false) @map("is_verified")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  // Back-references
+  userRoles            UserRole[]
+  userProfile          UserProfile?
+  providerProfile      ProviderProfile?
+  wallet               Wallet?
+  addresses            Address[]
+  bookings             Booking[]              @relation("CustomerBookings")
+  reviews              Review[]
+  disputes             Dispute[]
+  disputeMessages      DisputeMessage[]
+  notifications        Notification[]
+  couponUsages         CouponUsage[]
+  otpVerifications     OtpVerification[]
+  /// Tracks which status changes this user initiated (as admin or participant).
+  bookingStatusChanges BookingStatusHistory[]
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: user_roles
+//
+// Why it exists:
+//   Junction table for the many-to-many relationship between users and roles.
+//   A single user can be both a CUSTOMER and a PROVIDER simultaneously.
+//   This table records that assignment with a timestamp for auditability.
+//
+// Cascade behavior:
+//   • onDelete: Cascade on userId — if a user is deleted, remove their role assignments.
+//   • onDelete: Restrict on roleId — prevent deleting a role that is still assigned to users.
+//
+// Constraints:
+//   • @@unique([userId, roleId]) — prevents assigning the same role twice to the same user.
+// ─────────────────────────────────────────────────────────────────────────────
+model UserRole {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id")
+  roleId    Int      @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@map("user_roles")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: user_profiles
+//
+// Why it exists:
+//   Stores customer-specific profile data, separated from auth concerns.
+//   Keeping this in a 1:1 table (rather than columns on `users`) keeps the
+//   users table lean and focused on authentication. Profile data is optional
+//   until the user completes onboarding.
+//
+// Fields:
+//   • userId        FK to users — enforces the 1:1 constraint via @unique.
+//   • dateOfBirth   @db.Date — stores date only, no time component needed.
+//
+// Cascade behavior:
+//   • onDelete: Cascade — profile has no meaning without its parent user.
+// ─────────────────────────────────────────────────────────────────────────────
+model UserProfile {
+  id          Int       @id @default(autoincrement())
+  /// @unique enforces the 1:1 constraint at the database level.
+  userId      String    @unique @map("user_id")
+  firstName   String    @map("first_name")
+  lastName    String    @map("last_name")
+  avatarUrl   String?   @map("avatar_url")
+  /// Stored as DATE only — no time or timezone needed.
+  dateOfBirth DateTime? @map("date_of_birth") @db.Date
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: provider_profiles
+//
+// Why it exists:
+//   Stores provider-specific data: verification status, aggregate performance
+//   metrics, and operational flags. Separated from users to keep the auth
+//   table focused. A user only gets a provider_profile row after applying to
+//   become a provider.
+//
+// Fields:
+//   • verificationStatus  Admin-controlled gate before the provider can receive bookings.
+//   • avgRating           Decimal(3,2) — supports values like 4.87. Updated via middleware
+//                         after each new review is created.
+//   • totalReviews        Denormalized count updated via middleware — avoids COUNT() on every query.
+//   • totalBookings       Same denormalization rationale.
+//   • isAvailable         Provider can toggle themselves offline (e.g., on vacation).
+//
+// Cascade behavior:
+//   • onDelete: Cascade — provider profile has no meaning without its parent user.
+//
+// Indexes:
+//   • verificationStatus — admin dashboard filters providers by status constantly.
+//   • isAvailable — catalog search always filters by isAvailable = true.
+// ─────────────────────────────────────────────────────────────────────────────
+model ProviderProfile {
+  id                 Int                @id @default(autoincrement())
+  userId             String             @unique @map("user_id")
+  bio                String?
+  experienceYears    Int                @default(0) @map("experience_years")
+  verificationStatus VerificationStatus @default(PENDING) @map("verification_status")
+  /// Stored as Decimal(3,2) — e.g., 4.87. Updated after each review.
+  avgRating          Decimal            @default(0.00) @map("avg_rating") @db.Decimal(3, 2)
+  totalReviews       Int                @default(0) @map("total_reviews")
+  totalBookings      Int                @default(0) @map("total_bookings")
+  isAvailable        Boolean            @default(true) @map("is_available")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerServices ProviderService[]
+  availability     ProviderAvailability[]
+  timeOffs         ProviderTimeOff[]
+  bookings         Booking[]              @relation("ProviderBookings")
+  reviews          Review[]
+  reviewReplies    ReviewReply[]
+  documents        ProviderDocument[]
+
+  @@index([verificationStatus])
+  @@index([isAvailable])
+  @@map("provider_profiles")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: service_categories
+//
+// Why it exists:
+//   Top-level groupings displayed on the homepage (Plumbing, Electrical,
+//   Cleaning, etc.). Categories organize the service catalog and drive UI
+//   navigation. Separated from services for clean hierarchy.
+//
+// Fields:
+//   • sortOrder   Controls display order in the UI — lower number = appears first.
+//   • isActive    Soft-disables a category without deleting its services.
+//
+// Cascade behavior:
+//   • Services use onDelete: Restrict — cannot delete a category if services exist under it.
+//
+// Indexes:
+//   • isActive — catalog API always filters active categories.
+// ─────────────────────────────────────────────────────────────────────────────
+model ServiceCategory {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  iconUrl     String?  @map("icon_url")
+  isActive    Boolean  @default(true) @map("is_active")
+  /// Controls display ordering in the UI. Lower = first.
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  services Service[]
+
+  @@index([isActive])
+  @@map("service_categories")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: services
+//
+// Why it exists:
+//   A master catalog of bookable services (e.g., "Pipe Leak Repair",
+//   "Ceiling Fan Installation"). Defined by admins. Providers then select
+//   from this catalog and optionally override the base price.
+//
+// Fields:
+//   • basePrice   Platform's reference price. Providers can set customPrice in
+//                 provider_services to override it.
+//   • unit        Describes the pricing unit (e.g., "per visit", "per hour").
+//                 Displayed in the UI alongside the price.
+//
+// Cascade behavior:
+//   • onDelete: Restrict on categoryId — cannot delete a category with services.
+//   • provider_services and bookings use Restrict — a service cannot be deleted
+//     if providers are offering it or it appears in a booking.
+//
+// Indexes:
+//   • categoryId — primary filter when loading the catalog by category.
+//   • isActive — catalog API filters for active services only.
+// ─────────────────────────────────────────────────────────────────────────────
+model Service {
+  id          Int      @id @default(autoincrement())
+  categoryId  Int      @map("category_id")
+  name        String
+  description String?
+  /// Platform reference price. Providers may override via provider_services.customPrice.
+  basePrice   Decimal  @map("base_price") @db.Decimal(10, 2)
+  /// e.g., "per visit", "per hour", "per sq ft"
+  unit        String?
+  imageUrl    String?  @map("image_url")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  category         ServiceCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  providerServices ProviderService[]
+  bookings         Booking[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@map("services")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: provider_services
+//
+// Why it exists:
+//   The junction between a provider and the services they offer. This table
+//   records the provider's custom price, availability for that specific service,
+//   and any service-specific description. It is what gets listed in discovery
+//   search results — not the global services table directly.
+//
+// Fields:
+//   • customPrice   If null, the booking uses Service.basePrice. If set, this
+//                   overrides the base price for this specific provider.
+//
+// Cascade behavior:
+//   • onDelete: Cascade on providerId — if a provider profile is removed, their
+//     service offerings are meaningless and should be removed too.
+//   • onDelete: Restrict on serviceId — prevents deleting a service that is
+//     actively offered by providers.
+//
+// Constraints:
+//   • @@unique([providerId, serviceId]) — a provider can offer each service only once.
+//
+// Indexes:
+//   • providerId — primary key for "load all services this provider offers".
+//   • serviceId  — primary key for "load all providers offering this service" (discovery).
+// ─────────────────────────────────────────────────────────────────────────────
+model ProviderService {
+  id          Int      @id @default(autoincrement())
+  providerId  Int      @map("provider_id")
+  serviceId   Int      @map("service_id")
+  /// If null, the booking will use Service.basePrice. If set, this is the provider's price.
+  customPrice Decimal? @map("custom_price") @db.Decimal(10, 2)
+  isAvailable Boolean  @default(true) @map("is_available")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  service  Service         @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  bookings Booking[]
+
+  @@unique([providerId, serviceId])
+  @@index([providerId])
+  @@index([serviceId])
+  @@map("provider_services")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: addresses
+//
+// Why it exists:
+//   Customers can save multiple service addresses (home, office, parents' house).
+//   The booking locks in a specific address at creation time, so even if the
+//   address is later deleted, the booking's addressId references what was used.
+//
+// Fields:
+//   • label       User-defined label like "Home" or "Office".
+//   • latitude / longitude   Decimal(10,7) — ~1cm precision for geospatial queries.
+//   • pincode     Used for provider discovery filtering by service area.
+//   • isDefault   UI pre-selects this address for new bookings.
+//
+// Cascade behavior:
+//   • onDelete: Cascade on userId — if a user account is deleted, their addresses go too.
+//   • Bookings use onDelete: Restrict on addressId — cannot delete an address
+//     referenced by an existing booking (financial/legal record).
+//
+// Indexes:
+//   • userId — load all addresses for a user.
+//   • pincode — provider discovery queries filter by pincode.
+// ─────────────────────────────────────────────────────────────────────────────
+model Address {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id")
+  /// User-defined label, e.g. "Home", "Office".
+  label     String?
+  line1     String   @map("line1")
+  line2     String?  @map("line2")
+  city      String
+  state     String
+  pincode   String
+  /// Decimal(10,7) gives ~1cm geospatial precision.
+  latitude  Decimal? @db.Decimal(10, 7)
+  longitude Decimal? @db.Decimal(10, 7)
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([userId])
+  @@index([pincode])
+  @@map("addresses")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: bookings
+//
+// Why it exists:
+//   The central fact table — the core business transaction of the entire platform.
+//   Every booking joins: a customer, a provider, a specific service offering,
+//   a physical address, and optionally a coupon. Financial amounts are
+//   denormalized here (not re-computed from joins) to create an immutable
+//   financial record that survives future price changes.
+//
+// Fields:
+//   • serviceId         Denormalized from providerService for direct reporting.
+//   • providerServiceId The exact provider offering (with the price at booking time).
+//   • baseAmount        The price charged before any discount.
+//   • discountAmount    The coupon discount applied (0.00 if no coupon).
+//   • totalAmount       baseAmount - discountAmount. The final amount charged.
+//   • scheduledAt       When the customer wants the service performed.
+//   • completedAt       Set when the booking transitions to COMPLETED.
+//   • notes             Customer instructions to the provider.
+//   • cancellationReason  Captured when status transitions to CANCELLED.
+//
+// Cascade behavior:
+//   • All FKs use onDelete: Restrict — bookings are permanent financial records.
+//     Nothing they reference should be deletable while they exist.
+//   • couponId uses onDelete: SetNull — if a coupon is deleted, preserve the
+//     booking record; the discount amount is already captured in discountAmount.
+//
+// Indexes:
+//   • customerId  — "my bookings" queries.
+//   • providerId  — "my jobs" queries for providers.
+//   • status      — dashboard filtering (active, completed, etc.).
+//   • scheduledAt — calendar/schedule queries.
+// ─────────────────────────────────────────────────────────────────────────────
+model Booking {
+  id                 Int           @id @default(autoincrement())
+  customerId         String        @map("customer_id")
+  providerId         Int           @map("provider_id")
+  /// Denormalized for direct service-level reporting without joining through provider_services.
+  serviceId          Int           @map("service_id")
+  /// The exact provider_service record — captures price and availability at booking time.
+  providerServiceId  Int           @map("provider_service_id")
+  addressId          Int           @map("address_id")
+  couponId           Int?          @map("coupon_id")
+  status             BookingStatus @default(PENDING)
+  scheduledAt        DateTime      @map("scheduled_at")
+  completedAt        DateTime?     @map("completed_at")
+  /// Price before coupon discount. Immutable snapshot at booking creation.
+  baseAmount         Decimal       @map("base_amount") @db.Decimal(10, 2)
+  /// Discount amount applied by the coupon. 0.00 if no coupon used.
+  discountAmount     Decimal       @default(0.00) @map("discount_amount") @db.Decimal(10, 2)
+  /// Final charged amount: baseAmount - discountAmount.
+  totalAmount        Decimal       @map("total_amount") @db.Decimal(10, 2)
+  /// Customer's specific instructions to the provider.
+  notes              String?
+  cancellationReason String?       @map("cancellation_reason")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  customer           User                   @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Restrict)
+  provider           ProviderProfile        @relation("ProviderBookings", fields: [providerId], references: [id], onDelete: Restrict)
+  service            Service                @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  providerService    ProviderService        @relation(fields: [providerServiceId], references: [id], onDelete: Restrict)
+  address            Address                @relation(fields: [addressId], references: [id], onDelete: Restrict)
+  /// SetNull: if coupon is deleted, preserve booking; discountAmount already captures the value.
+  coupon             Coupon?                @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  statusHistory      BookingStatusHistory[]
+  payments           Payment[]
+  walletTransactions WalletTransaction[]
+  review             Review?
+  disputes           Dispute[]
+  couponUsage        CouponUsage?
+
+  @@index([customerId])
+  @@index([providerId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("bookings")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: booking_status_history
+//
+// Why it exists:
+//   An append-only audit trail of every status transition a booking goes through.
+//   This is essential for dispute resolution, reporting, and regulatory compliance.
+//   No updatedAt field by design — rows must never be modified after insertion.
+//
+// Fields:
+//   • changedById   The user (admin, customer, or provider) who triggered the transition.
+//                   Nullable because system-triggered transitions have no actor.
+//   • reason        Free-text explanation of why the status changed.
+//
+// Cascade behavior:
+//   • onDelete: Cascade on bookingId — history rows have no meaning without their booking.
+//   • onDelete: SetNull on changedById — preserve the audit trail even if the actor
+//     user is later deactivated or removed.
+//
+// Indexes:
+//   • bookingId — always queried by booking when loading the timeline.
+// ─────────────────────────────────────────────────────────────────────────────
+model BookingStatusHistory {
+  id          Int           @id @default(autoincrement())
+  bookingId   Int           @map("booking_id")
+  status      BookingStatus
+  /// The user who triggered this transition. Null for system-automated transitions.
+  changedById String?       @map("changed_by_id")
+  reason      String?
+  /// Append-only — no updatedAt by design.
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  /// SetNull: preserve history even if the actor user is removed.
+  changedBy User?   @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([bookingId])
+  @@map("booking_status_history")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: provider_availability
+//
+// Why it exists:
+//   Defines a provider's recurring weekly working schedule. When a customer
+//   selects a date, the system checks this table to determine available time
+//   slots, then cross-references provider_time_off for exceptions.
+//
+// Fields:
+//   • dayOfWeek   Enum — not a raw string, prevents invalid day insertion.
+//   • startTime / endTime   Stored as "HH:MM" strings. Using @db.Time is possible
+//                           but Prisma's Time type support is inconsistent across
+//                           adapters. String "HH:MM" is unambiguous and portable.
+//   • isAvailable   Allows a provider to mark a specific day as unavailable without
+//                   deleting the row (preserves the time slot for easy re-activation).
+//
+// Cascade behavior:
+//   • onDelete: Cascade on providerId — availability has no meaning without the provider.
+//
+// Constraints:
+//   • @@unique([providerId, dayOfWeek]) — one schedule slot per day of week per provider.
+// ─────────────────────────────────────────────────────────────────────────────
+model ProviderAvailability {
+  id          Int       @id @default(autoincrement())
+  providerId  Int       @map("provider_id")
+  dayOfWeek   DayOfWeek @map("day_of_week")
+  /// Format: "HH:MM" in 24-hour time (e.g., "09:00").
+  startTime   String    @map("start_time")
+  /// Format: "HH:MM" in 24-hour time (e.g., "18:00").
+  endTime     String    @map("end_time")
+  /// If false, the provider has blocked this day without removing the schedule entry.
+  isAvailable Boolean   @default(true) @map("is_available")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, dayOfWeek])
+  @@index([providerId])
+  @@map("provider_availability")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: provider_time_off
+//
+// Why it exists:
+//   Handles exceptions to the recurring availability schedule. If a provider
+//   is on vacation or unavailable for specific dates, they add a time-off
+//   record. The availability check logic queries this table alongside
+//   provider_availability to determine if a given date is bookable.
+//
+// Fields:
+//   • startDate / endDate   @db.Date — date ranges, no time component needed.
+//                           This allows single-day off (startDate == endDate)
+//                           or multi-day (e.g., a week-long vacation).
+//
+// Cascade behavior:
+//   • onDelete: Cascade on providerId — time-offs have no meaning without the provider.
+//
+// Indexes:
+//   • providerId  — load all time-offs for a provider.
+//   • (startDate, endDate) — range overlap queries during availability checks.
+// ─────────────────────────────────────────────────────────────────────────────
+model ProviderTimeOff {
+  id         Int      @id @default(autoincrement())
+  providerId Int      @map("provider_id")
+  /// Inclusive start of the unavailable date range.
+  startDate  DateTime @map("start_date") @db.Date
+  /// Inclusive end of the unavailable date range. Same as startDate for single-day off.
+  endDate    DateTime @map("end_date") @db.Date
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@index([startDate, endDate])
+  @@map("provider_time_off")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: payments
+//
+// Why it exists:
+//   Records every payment attempt for a booking. Multiple attempts are expected
+//   (customer tries card, it fails, retries with UPI). Only one attempt should
+//   reach SUCCESS status per booking — enforced at the service layer.
+//
+// Fields:
+//   • bookingId     NOT unique — allows multiple attempts for the same booking.
+//   • transactionRef  UNIQUE — the payment gateway's reference ID. Prevents
+//                     duplicate webhook processing (idempotency key).
+//   • gatewayResponse  Raw JSON response from the payment gateway. Stored for
+//                      debugging and dispute evidence.
+//   • paidAt        Set only when status transitions to SUCCESS.
+//
+// Cascade behavior:
+//   • onDelete: Restrict on bookingId — payment records are financial evidence;
+//     the booking cannot be deleted while payment records exist.
+//
+// Indexes:
+//   • bookingId — load all payment attempts for a booking.
+//   • status    — query pending/failed payments for retry logic and reporting.
+// ─────────────────────────────────────────────────────────────────────────────
+model Payment {
+  id              Int           @id @default(autoincrement())
+  /// Not unique — multiple payment attempts per booking are explicitly supported.
+  bookingId       Int           @map("booking_id")
+  /// Unique — payment gateway reference. Acts as idempotency key for webhook processing.
+  transactionRef  String        @unique @map("transaction_ref")
+  amount          Decimal       @db.Decimal(10, 2)
+  method          PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  /// Raw response from the payment gateway. Useful for debugging and dispute evidence.
+  gatewayResponse Json?         @map("gateway_response")
+  /// Set only when status transitions to SUCCESS.
+  paidAt          DateTime?     @map("paid_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+  @@index([status])
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: wallets
+//
+// Why it exists:
+//   Every user (both customers and providers) has a wallet. Customers can
+//   top up their wallet and pay for bookings with it. Providers receive
+//   their earnings here after booking completion. The balance field is a
+//   denormalized running total — the authoritative source of truth is the
+//   wallet_transactions ledger.
+//
+// Fields:
+//   • balance   Maintained by the service layer after each transaction.
+//               Must always equal SUM(credits) - SUM(debits) for this wallet.
+//
+// Cascade behavior:
+//   • onDelete: Cascade on userId — wallet has no meaning without its user.
+//   • wallet_transactions use onDelete: Restrict — cannot delete a wallet
+//     that has transaction history (financial records).
+// ─────────────────────────────────────────────────────────────────────────────
+model Wallet {
+  id        Int      @id @default(autoincrement())
+  userId    String   @unique @map("user_id")
+  /// Running balance. Denormalized for performance. Authoritative source is wallet_transactions.
+  balance   Decimal  @default(0.00) @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: wallet_transactions
+//
+// Why it exists:
+//   An immutable, append-only ledger of every money movement in a wallet.
+//   This is the financial source of truth. Never modify rows — only insert.
+//   The balance in the wallets table is always derivable from this table.
+//
+// Fields:
+//   • type          CREDIT (money in) or DEBIT (money out).
+//   • balanceBefore  Snapshot of wallet balance before this transaction.
+//   • balanceAfter   Snapshot of wallet balance after this transaction.
+//                    These two fields allow reconstruction of balance history
+//                    without replaying all transactions.
+//   • bookingId     Optional reference to the booking that caused this transaction.
+//                   Stored as a proper FK for referential integrity.
+//   • description   Human-readable reason (e.g., "Booking #42 payment", "Top-up").
+//
+// Cascade behavior:
+//   • onDelete: Restrict on walletId — cannot delete a wallet with transactions.
+//   • onDelete: Restrict on bookingId — cannot delete a booking with wallet transactions.
+//
+// Note: No updatedAt field — this table is intentionally immutable.
+//
+// Indexes:
+//   • walletId — primary access pattern: load all transactions for a wallet.
+//   • status   — query pending transactions for settlement jobs.
+// ─────────────────────────────────────────────────────────────────────────────
+model WalletTransaction {
+  id            Int                     @id @default(autoincrement())
+  walletId      Int                     @map("wallet_id")
+  type          WalletTransactionType
+  amount        Decimal                 @db.Decimal(10, 2)
+  status        WalletTransactionStatus @default(PENDING)
+  description   String?
+  /// Optional: the booking that caused this wallet movement.
+  bookingId     Int?                    @map("booking_id")
+  /// Balance snapshot before this transaction — enables historical balance reconstruction.
+  balanceBefore Decimal                 @map("balance_before") @db.Decimal(10, 2)
+  /// Balance snapshot after this transaction.
+  balanceAfter  Decimal                 @map("balance_after") @db.Decimal(10, 2)
+  /// Append-only — no updatedAt by design.
+  createdAt     DateTime                @default(now()) @map("created_at")
+
+  wallet  Wallet   @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([walletId])
+  @@index([status])
+  @@map("wallet_transactions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: reviews
+//
+// Why it exists:
+//   Customers leave a rating and optional comment after a booking is completed.
+//   Reviews are strictly 1:1 with bookings — a customer can review each booking
+//   only once. Reviews drive the provider's avgRating and totalReviews aggregates.
+//
+// Fields:
+//   • rating    Integer 1–5. Range enforcement is handled in the service layer
+//               (Prisma does not support CHECK constraints natively).
+//   • bookingId @unique — enforces the 1:1 booking-review constraint at DB level.
+//
+// Cascade behavior:
+//   • onDelete: Restrict on all FKs — reviews are permanent records and should
+//     not be cascade-deleted from a booking, user, or provider deletion.
+//
+// Indexes:
+//   • providerId — load all reviews for a provider (their public profile page).
+//   • customerId — load reviews a customer has written.
+// ─────────────────────────────────────────────────────────────────────────────
+model Review {
+  id         Int      @id @default(autoincrement())
+  /// @unique enforces one review per booking at the database level.
+  bookingId  Int      @unique @map("booking_id")
+  customerId String   @map("customer_id")
+  providerId Int      @map("provider_id")
+  /// Integer 1–5. Enforced in range in the service layer.
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  booking  Booking         @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  customer User            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  reply    ReviewReply?
+
+  @@index([providerId])
+  @@index([customerId])
+  @@map("reviews")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: review_replies
+//
+// Why it exists:
+//   Allows providers to respond to customer reviews.
+model ReviewReply {
+  id         Int      @id @default(autoincrement())
+  reviewId   Int      @unique @map("review_id")
+  providerId Int      @map("provider_id")
+  comment    String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  review   Review          @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  @@index([providerId])
+  @@map("review_replies")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: disputes
+//
+// Why it exists:
+//   A support ticket system for resolving issues with bookings. Either the
+//   customer or provider can raise a dispute. Admins manage the resolution
+//   workflow. Disputes have threaded messaging via dispute_messages.
+//
+// Fields:
+//   • raisedById  The user who opened the dispute (customer or provider's user ID).
+//   • subject     Short title for the dispute.
+//   • description Initial description of the problem.
+//   • status      State machine: OPEN → IN_REVIEW → RESOLVED or CLOSED.
+//   • resolution  Admin's final resolution note, set when status → RESOLVED.
+//   • resolvedAt  Timestamp of resolution.
+//
+// Cascade behavior:
+//   • onDelete: Restrict on bookingId — cannot delete a booking with open disputes.
+//   • onDelete: Restrict on raisedById — preserve the dispute record; the user
+//     who raised it should not be deletable while disputes exist.
+//
+// Indexes:
+//   • bookingId  — load all disputes for a booking.
+//   • raisedById — load all disputes raised by a user.
+//   • status     — admin dashboard filters by status.
+// ─────────────────────────────────────────────────────────────────────────────
+model Dispute {
+  id          Int           @id @default(autoincrement())
+  bookingId   Int           @map("booking_id")
+  raisedById  String        @map("raised_by_id")
+  subject     String
+  description String
+  status      DisputeStatus @default(OPEN)
+  resolvedAt  DateTime?     @map("resolved_at")
+  /// Admin's resolution note. Set when status transitions to RESOLVED.
+  resolution  String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  booking  Booking          @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  raisedBy User             @relation(fields: [raisedById], references: [id], onDelete: Restrict)
+  messages DisputeMessage[]
+
+  @@index([bookingId])
+  @@index([raisedById])
+  @@index([status])
+  @@map("disputes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: dispute_messages
+//
+// Why it exists:
+//   Threaded conversation within a dispute. Customers, providers, and admins
+//   can all send messages. This creates a structured conversation record
+//   that admins use to make resolution decisions.
+//
+// Cascade behavior:
+//   • onDelete: Cascade on disputeId — messages have no meaning without the dispute.
+//   • onDelete: Restrict on senderId — preserve message history; the sender should
+//     not be deletable while their messages exist in an active dispute.
+//
+// Indexes:
+//   • disputeId — load all messages for a dispute thread (always queried together).
+// ─────────────────────────────────────────────────────────────────────────────
+model DisputeMessage {
+  id        Int      @id @default(autoincrement())
+  disputeId Int      @map("dispute_id")
+  senderId  String   @map("sender_id")
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  sender  User    @relation(fields: [senderId], references: [id], onDelete: Restrict)
+
+  @@index([disputeId])
+  @@map("dispute_messages")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: notifications
+//
+// Why it exists:
+//   Drives the in-app notification feed for every user. Notifications are
+//   created by the service layer on key events (booking confirmed, payment
+//   received, dispute raised, etc.). The client polls or subscribes to
+//   this table to display the notification bell.
+//
+// Fields:
+//   • type    Enum — drives the icon and deep-link behavior in the client app.
+//   • title   Short notification headline (e.g., "Booking Confirmed").
+//   • body    Full notification text.
+//   • isRead  Toggled to true when the user views the notification.
+//   • data    Optional JSON payload for additional context
+//             (e.g., { "bookingId": 42 } for deep-linking).
+//
+// Cascade behavior:
+//   • onDelete: Cascade on userId — notifications have no meaning without the user.
+//
+// Indexes:
+//   • userId  — load all notifications for a user.
+//   • isRead  — badge count queries filter by isRead = false.
+// ─────────────────────────────────────────────────────────────────────────────
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false) @map("is_read")
+  /// Optional JSON payload for deep-linking in the client app. e.g., { "bookingId": 42 }
+  data      Json?
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: coupons
+//
+// Why it exists:
+//   Admin-created discount codes. Two discount strategies:
+//   PERCENTAGE (e.g., 20% off) or FLAT (e.g., ₹100 off).
+//   Usage is tracked via coupon_usages and the denormalized usageCount field.
+//
+// Fields:
+//   • discountValue  The percentage OR flat amount (interpreted by `type`).
+//   • maxDiscount    Cap for PERCENTAGE coupons (e.g., "max ₹200 off on 20%").
+//   • minOrderValue  Minimum booking total to be eligible for the coupon.
+//   • maxUsage       Total uses allowed across all users. Null = unlimited.
+//   • usageCount     Denormalized counter — incremented on each valid use.
+//   • perUserLimit   How many times one user can use this coupon. Default: 1.
+//   • validFrom / validUntil  Date range during which the coupon is valid.
+//
+// Cascade behavior:
+//   • coupon_usages use onDelete: Restrict — cannot delete a used coupon.
+//   • bookings use onDelete: SetNull on couponId — preserve booking if coupon deleted.
+//
+// Indexes:
+//   • code    — validation queries always look up by code.
+//   • status  — admin dashboard filters by status.
+// ─────────────────────────────────────────────────────────────────────────────
+model Coupon {
+  id            Int          @id @default(autoincrement())
+  code          String       @unique
+  type          CouponType
+  discountValue Decimal      @map("discount_value") @db.Decimal(10, 2)
+  /// For PERCENTAGE type: caps the maximum discount amount (e.g., max ₹200 off).
+  maxDiscount   Decimal?     @map("max_discount") @db.Decimal(10, 2)
+  /// Minimum booking total required to apply this coupon.
+  minOrderValue Decimal?     @map("min_order_value") @db.Decimal(10, 2)
+  /// Total redemptions allowed across all users. Null = unlimited.
+  maxUsage      Int?         @map("max_usage")
+  /// Denormalized counter. Incremented atomically on each valid redemption.
+  usageCount    Int          @default(0) @map("usage_count")
+  /// How many times a single user can use this coupon. Default: 1 (once per user).
+  perUserLimit  Int          @default(1) @map("per_user_limit")
+  status        CouponStatus @default(ACTIVE)
+  validFrom     DateTime     @map("valid_from")
+  validUntil    DateTime     @map("valid_until")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  usages   CouponUsage[]
+  bookings Booking[]
+
+  @@index([status])
+  @@map("coupons")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: coupon_usages
+//
+// Why it exists:
+//   Tracks which user used which coupon for which booking. This table is
+//   the authoritative source for enforcing per-user coupon limits.
+//   Before applying a coupon, the service layer counts the user's existing
+//   usages for that coupon and compares against Coupon.perUserLimit.
+//
+// Fields:
+//   • bookingId   @unique — one usage record per booking (a booking can use at most
+//                 one coupon, and that coupon creates exactly one usage record).
+//
+// Cascade behavior:
+//   • onDelete: Restrict on couponId — cannot delete a coupon that has been used.
+//   • onDelete: Restrict on userId — cannot delete a user with coupon usage history.
+//   • onDelete: Restrict on bookingId — cannot delete a booking tied to a coupon usage.
+//
+// Constraints:
+//   • bookingId @unique — one coupon usage per booking at the DB level.
+//
+// Indexes:
+//   • (couponId, userId) — primary query for per-user limit enforcement checks.
+//   • userId — load all coupons a user has used.
+// ─────────────────────────────────────────────────────────────────────────────
+model CouponUsage {
+  id        Int      @id @default(autoincrement())
+  couponId  Int      @map("coupon_id")
+  userId    String   @map("user_id")
+  /// @unique ensures one coupon usage record per booking.
+  bookingId Int      @unique @map("booking_id")
+  usedAt    DateTime @default(now()) @map("used_at")
+
+  coupon  Coupon  @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+
+  @@index([couponId, userId])
+  @@index([userId])
+  @@map("coupon_usages")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: provider_documents
+//
+// Why it exists:
+//   Providers must upload verification documents (ID proof, address proof,
+//   certifications) during onboarding. Admins review each document
+//   individually and update their status. The provider's overall
+//   verificationStatus on provider_profiles is updated once all
+//   required documents are approved.
+//
+// Fields:
+//   • documentType   Enum — determines which documents are required and drives UI.
+//   • documentUrl    The file path or cloud storage URL.
+//   • status         Per-document approval status (independent of provider's overall status).
+//   • adminNotes     Admin's feedback on the document (e.g., "Image is blurry, resubmit").
+//   • reviewedAt     Timestamp when the admin changed the status.
+//
+// Cascade behavior:
+//   • onDelete: Cascade on providerId — documents have no meaning without the provider.
+//
+// Indexes:
+//   • providerId — load all documents for a provider during admin review.
+//   • status     — admin dashboard queues filter by PENDING documents.
+// ─────────────────────────────────────────────────────────────────────────────
+model ProviderDocument {
+  id           Int                @id @default(autoincrement())
+  providerId   Int                @map("provider_id")
+  documentType DocumentType       @map("document_type")
+  documentUrl  String             @map("document_url")
+  /// Per-document approval status — independent of the provider's overall verificationStatus.
+  status       VerificationStatus @default(PENDING)
+  /// Admin feedback, e.g. "Image is blurry, please resubmit".
+  adminNotes   String?            @map("admin_notes")
+  reviewedAt   DateTime?          @map("reviewed_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@index([status])
+  @@map("provider_documents")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TABLE: otp_verifications
+//
+// Why it exists:
+//   Stores short-lived OTP codes for email verification, phone verification,
+//   and password reset flows. Each code has a purpose, an expiry, and a
+//   one-time-use flag. Old/expired codes should be cleaned up periodically
+//   by a background job.
+//
+// Fields:
+//   • otp       The raw OTP code. In production, store a bcrypt hash of the OTP
+//               for additional security (hashing is optional given the short TTL).
+//   • purpose   Enum — determines validation rules and the action taken on success.
+//   • isUsed    True once the OTP has been successfully verified. Prevents replay attacks.
+//   • expiresAt The absolute timestamp after which this OTP is invalid.
+//
+// Cascade behavior:
+//   • onDelete: Cascade on userId — OTPs have no meaning without the user.
+//
+// Indexes:
+//   • userId     — look up pending OTPs for a user.
+//   • expiresAt  — background cleanup job queries by expiry time.
+// ─────────────────────────────────────────────────────────────────────────────
+model OtpVerification {
+  id        Int        @id @default(autoincrement())
+  userId    String     @map("user_id")
+  /// The OTP code. Consider hashing with bcrypt in the service layer for added security.
+  otp       String
+  purpose   OtpPurpose
+  /// True once the OTP is consumed. Prevents replay attacks.
+  isUsed    Boolean    @default(false) @map("is_used")
+  expiresAt DateTime   @map("expires_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("otp_verifications")
+}

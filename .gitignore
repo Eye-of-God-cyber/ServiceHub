@@ -1,0 +1,33 @@
+# ─── Dependencies ─────────────────────────────────────
+node_modules/
+
+# ─── Environment Secrets ──────────────────────────────
+.env
+.env.local
+.env.production
+
+# ─── Logs ─────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ─── Uploads (user-uploaded files) ────────────────────
+uploads/
+
+# ─── Build / Compiled ─────────────────────────────────
+dist/
+build/
+
+# ─── OS & Editor Artifacts ────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+
+# ─── Prisma Generated Client ──────────────────────────
+# The generated client is always re-created via `prisma generate`
+# so there is no need to commit it.
+# node_modules/@prisma/client is excluded above via node_modules/
+
+# ─── Misc ─────────────────────────────────────────────
+*.swp
+*.swo

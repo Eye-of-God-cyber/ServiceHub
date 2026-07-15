@@ -1,0 +1,5 @@
+# This file is intentionally left minimal.
+# The full Prisma schema will be created in Milestone 2.
+# Prisma requires this directory to exist and expects schema.prisma here.
+
+# The seed script will be added in Milestone 2 after all models are defined.
