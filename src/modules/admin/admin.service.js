@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 
 const updateDocumentStatus = async (docId, status, adminNotes) => {
   const doc = await prisma.providerDocument.findUnique({ where: { id: docId } });
-  if (!doc) throw new AppError('Document not found', StatusCodes.NOT_FOUND);
+  if (!doc) {throw new AppError('Document not found', StatusCodes.NOT_FOUND);}
 
   return prisma.$transaction(async (tx) => {
     const updatedDoc = await tx.providerDocument.update({
@@ -42,8 +42,8 @@ const updateDocumentStatus = async (docId, status, adminNotes) => {
 
 const resolveDispute = async (disputeId, resolution) => {
   const dispute = await prisma.dispute.findUnique({ where: { id: disputeId } });
-  if (!dispute) throw new AppError('Dispute not found', StatusCodes.NOT_FOUND);
-  if (dispute.status === 'RESOLVED') throw new AppError('Dispute is already resolved', StatusCodes.UNPROCESSABLE_ENTITY);
+  if (!dispute) {throw new AppError('Dispute not found', StatusCodes.NOT_FOUND);}
+  if (dispute.status === 'RESOLVED') {throw new AppError('Dispute is already resolved', StatusCodes.UNPROCESSABLE_ENTITY);}
 
   return prisma.dispute.update({
     where: { id: disputeId },

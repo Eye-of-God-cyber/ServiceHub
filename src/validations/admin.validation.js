@@ -1,7 +1,7 @@
 'use strict';
 
 const { body, param } = require('express-validator');
-const { DocumentStatus, DisputeStatus } = require('@prisma/client');
+
 
 const docIdParam = [
   param('docId').isInt({ min: 1 }).withMessage('docId must be a positive integer').toInt(),

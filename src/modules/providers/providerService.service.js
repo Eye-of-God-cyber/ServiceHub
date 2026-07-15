@@ -8,14 +8,14 @@ const prisma = new PrismaClient();
 
 const getProviderId = async (userId) => {
   const pp = await prisma.providerProfile.findUnique({ where: { userId }, select: { id: true } });
-  if (!pp) throw new AppError('Provider profile not found.', StatusCodes.NOT_FOUND);
+  if (!pp) {throw new AppError('Provider profile not found.', StatusCodes.NOT_FOUND);}
   return pp.id;
 };
 
 const assertOwnership = async (providerServiceId, providerId) => {
   const ps = await prisma.providerService.findUnique({ where: { id: providerServiceId }, select: { id: true, providerId: true } });
-  if (!ps) throw new AppError('Provider service not found.', StatusCodes.NOT_FOUND);
-  if (ps.providerId !== providerId) throw new AppError('You do not have permission to access this service.', StatusCodes.FORBIDDEN);
+  if (!ps) {throw new AppError('Provider service not found.', StatusCodes.NOT_FOUND);}
+  if (ps.providerId !== providerId) {throw new AppError('You do not have permission to access this service.', StatusCodes.FORBIDDEN);}
   return ps;
 };
 
@@ -38,7 +38,7 @@ const createProviderService = async (userId, payload) => {
   
   // Verify base service exists
   const baseSvc = await prisma.service.findUnique({ where: { id: serviceId } });
-  if (!baseSvc) throw new AppError('Base service not found.', StatusCodes.NOT_FOUND);
+  if (!baseSvc) {throw new AppError('Base service not found.', StatusCodes.NOT_FOUND);}
 
   // Check for duplicate
   const existing = await prisma.providerService.findFirst({
@@ -67,9 +67,9 @@ const updateProviderService = async (userId, providerServiceId, payload) => {
   const { customPrice, isAvailable, description } = payload;
   
   const data = {};
-  if (customPrice !== undefined) data.customPrice = customPrice;
-  if (isAvailable !== undefined) data.isAvailable = isAvailable;
-  if (description !== undefined) data.description = description;
+  if (customPrice !== undefined) {data.customPrice = customPrice;}
+  if (isAvailable !== undefined) {data.isAvailable = isAvailable;}
+  if (description !== undefined) {data.description = description;}
 
   return prisma.providerService.update({
     where: { id: providerServiceId },

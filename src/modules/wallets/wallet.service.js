@@ -39,7 +39,7 @@ const getMyWallet = async (userId, limit = 20) => {
  */
 const creditWallet = async (userId, amount, description, bookingId = null) => {
   const amt = new Decimal(amount);
-  if (amt.lte(0)) throw new AppError('Credit amount must be positive', StatusCodes.BAD_REQUEST);
+  if (amt.lte(0)) {throw new AppError('Credit amount must be positive', StatusCodes.BAD_REQUEST);}
 
   return prisma.$transaction(async (tx) => {
     // 1. Ensure wallet exists
@@ -80,7 +80,7 @@ const creditWallet = async (userId, amount, description, bookingId = null) => {
  */
 const debitWallet = async (userId, amount, description, bookingId = null) => {
   const amt = new Decimal(amount);
-  if (amt.lte(0)) throw new AppError('Debit amount must be positive', StatusCodes.BAD_REQUEST);
+  if (amt.lte(0)) {throw new AppError('Debit amount must be positive', StatusCodes.BAD_REQUEST);}
 
   return prisma.$transaction(async (tx) => {
     let wallet = await tx.wallet.findUnique({ where: { userId } });

@@ -108,14 +108,14 @@ const updateAddress = async (addressId, userId, payload) => {
   const { label, line1, line2, city, state, pincode, latitude, longitude } = payload;
 
   const data = {};
-  if (label     !== undefined) data.label     = label;
-  if (line1     !== undefined) data.line1     = line1;
-  if (line2     !== undefined) data.line2     = line2;
-  if (city      !== undefined) data.city      = city;
-  if (state     !== undefined) data.state     = state;
-  if (pincode   !== undefined) data.pincode   = pincode;
-  if (latitude  !== undefined) data.latitude  = latitude;
-  if (longitude !== undefined) data.longitude = longitude;
+  if (label     !== undefined) {data.label     = label;}
+  if (line1     !== undefined) {data.line1     = line1;}
+  if (line2     !== undefined) {data.line2     = line2;}
+  if (city      !== undefined) {data.city      = city;}
+  if (state     !== undefined) {data.state     = state;}
+  if (pincode   !== undefined) {data.pincode   = pincode;}
+  if (latitude  !== undefined) {data.latitude  = latitude;}
+  if (longitude !== undefined) {data.longitude = longitude;}
 
   return prisma.address.update({
     where: { id: addressId },

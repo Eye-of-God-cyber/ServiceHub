@@ -68,15 +68,15 @@ router.put('/me', authenticate, authorize(ROLES.PROVIDER), updateProviderProfile
 // ─────────────────────────────────────────────────────────────────────────────
 // Provider Documents (5B)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/me/documents', authenticate, authorize(ROLES.PROVIDER), async (req, res) => {
+router.get('/documents', authenticate, authorize(ROLES.PROVIDER), async (req, res) => {
   const docs = await docService.getDocuments(req.user.id);
   res.json(new ApiResponse(StatusCodes.OK, docs, 'Documents fetched successfully'));
 });
-router.post('/me/documents', authenticate, authorize(ROLES.PROVIDER), createDocumentValidation, validate, async (req, res) => {
+router.post('/documents', authenticate, authorize(ROLES.PROVIDER), createDocumentValidation, validate, async (req, res) => {
   const doc = await docService.createDocument(req.user.id, req.body);
   res.status(StatusCodes.CREATED).json(new ApiResponse(StatusCodes.CREATED, doc, 'Document submitted successfully'));
 });
-router.delete('/me/documents/:docId', authenticate, authorize(ROLES.PROVIDER), docIdParam, validate, async (req, res) => {
+router.delete('/documents/:docId', authenticate, authorize(ROLES.PROVIDER), docIdParam, validate, async (req, res) => {
   await docService.deleteDocument(req.user.id, req.params.docId);
   res.json(new ApiResponse(StatusCodes.OK, null, 'Document deleted successfully'));
 });
@@ -84,22 +84,22 @@ router.delete('/me/documents/:docId', authenticate, authorize(ROLES.PROVIDER), d
 // ─────────────────────────────────────────────────────────────────────────────
 // Provider Availability (5C)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/me/availability', authenticate, authorize(ROLES.PROVIDER), availabilityController.getAvailability);
-router.put('/me/availability', authenticate, authorize(ROLES.PROVIDER), updateAvailabilityValidation, validate, availabilityController.updateAvailability);
+router.get('/availability', authenticate, authorize(ROLES.PROVIDER), availabilityController.getAvailability);
+router.put('/availability', authenticate, authorize(ROLES.PROVIDER), updateAvailabilityValidation, validate, availabilityController.updateAvailability);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Provider Time Off (5C)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/me/time-off', authenticate, authorize(ROLES.PROVIDER), availabilityController.getTimeOffs);
-router.post('/me/time-off', authenticate, authorize(ROLES.PROVIDER), createTimeOffValidation, validate, availabilityController.createTimeOff);
-router.delete('/me/time-off/:timeOffId', authenticate, authorize(ROLES.PROVIDER), timeOffIdParam, validate, availabilityController.deleteTimeOff);
+router.get('/time-off', authenticate, authorize(ROLES.PROVIDER), availabilityController.getTimeOffs);
+router.post('/time-off', authenticate, authorize(ROLES.PROVIDER), createTimeOffValidation, validate, availabilityController.createTimeOff);
+router.delete('/time-off/:timeOffId', authenticate, authorize(ROLES.PROVIDER), timeOffIdParam, validate, availabilityController.deleteTimeOff);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Provider Services (5D)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/me/services', authenticate, authorize(ROLES.PROVIDER), psController.getProviderServices);
-router.post('/me/services', authenticate, authorize(ROLES.PROVIDER), createProviderServiceValidation, validate, psController.createProviderService);
-router.put('/me/services/:providerServiceId', authenticate, authorize(ROLES.PROVIDER), pSvcIdParam, updateProviderServiceValidation, validate, psController.updateProviderService);
-router.delete('/me/services/:providerServiceId', authenticate, authorize(ROLES.PROVIDER), pSvcIdParam, validate, psController.deleteProviderService);
+router.get('/services', authenticate, authorize(ROLES.PROVIDER), psController.getProviderServices);
+router.post('/services', authenticate, authorize(ROLES.PROVIDER), createProviderServiceValidation, validate, psController.createProviderService);
+router.put('/services/:providerServiceId', authenticate, authorize(ROLES.PROVIDER), pSvcIdParam, updateProviderServiceValidation, validate, psController.updateProviderService);
+router.delete('/services/:providerServiceId', authenticate, authorize(ROLES.PROVIDER), pSvcIdParam, validate, psController.deleteProviderService);
 
 module.exports = router;

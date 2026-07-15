@@ -30,9 +30,9 @@ const assertDisputeAccess = async (userId, userRoles, disputeId) => {
     include: { booking: { select: { customerId: true, providerId: true } } },
   });
 
-  if (!dispute) throw new AppError('Dispute not found', StatusCodes.NOT_FOUND);
+  if (!dispute) {throw new AppError('Dispute not found', StatusCodes.NOT_FOUND);}
 
-  if (userRoles.includes('ADMIN')) return dispute;
+  if (userRoles.includes('ADMIN')) {return dispute;}
 
   let isOwner = false;
   if (userRoles.includes('CUSTOMER') && dispute.booking.customerId === userId) {
@@ -45,7 +45,7 @@ const assertDisputeAccess = async (userId, userRoles, disputeId) => {
     }
   }
 
-  if (!isOwner) throw new AppError('You do not have permission to access this dispute', StatusCodes.FORBIDDEN);
+  if (!isOwner) {throw new AppError('You do not have permission to access this dispute', StatusCodes.FORBIDDEN);}
 
   return dispute;
 };
@@ -74,8 +74,8 @@ const getDisputes = async (userId, userRoles, filters = {}) => {
     }
   }
 
-  if (orConditions.length === 0 && !userRoles.includes('ADMIN')) return formatPaginatedResponse([], 0, 1, 20);
-  if (orConditions.length > 0) where.OR = orConditions;
+  if (orConditions.length === 0 && !userRoles.includes('ADMIN')) {return formatPaginatedResponse([], 0, 1, 20);}
+  if (orConditions.length > 0) {where.OR = orConditions;}
 
   const { page, limit, skip, take } = getPaginationOptions(filters);
 
@@ -101,16 +101,16 @@ const createDispute = async (userId, userRoles, payload) => {
   
   // Verify booking ownership (both Customer or Provider can raise a dispute)
   const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
-  if (!booking) throw new AppError('Booking not found', StatusCodes.NOT_FOUND);
+  if (!booking) {throw new AppError('Booking not found', StatusCodes.NOT_FOUND);}
   
   let isParticipant = false;
-  if (userRoles.includes('CUSTOMER') && booking.customerId === userId) isParticipant = true;
+  if (userRoles.includes('CUSTOMER') && booking.customerId === userId) {isParticipant = true;}
   if (!isParticipant && userRoles.includes('PROVIDER')) {
     const providerId = await getProviderId(userId);
-    if (providerId && booking.providerId === providerId) isParticipant = true;
+    if (providerId && booking.providerId === providerId) {isParticipant = true;}
   }
 
-  if (!isParticipant) throw new AppError('You are not a participant in this booking', StatusCodes.FORBIDDEN);
+  if (!isParticipant) {throw new AppError('You are not a participant in this booking', StatusCodes.FORBIDDEN);}
 
   return prisma.dispute.create({
     data: {

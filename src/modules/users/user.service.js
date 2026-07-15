@@ -150,13 +150,13 @@ const updateProfile = async (userId, payload) => {
 
   // Build only the fields that were actually supplied
   const userProfileData = {};
-  if (firstName !== undefined)   userProfileData.firstName   = firstName;
-  if (lastName !== undefined)    userProfileData.lastName    = lastName;
-  if (dateOfBirth !== undefined) userProfileData.dateOfBirth = dateOfBirth;
-  if (avatarUrl !== undefined)   userProfileData.avatarUrl   = avatarUrl;
+  if (firstName !== undefined)   {userProfileData.firstName   = firstName;}
+  if (lastName !== undefined)    {userProfileData.lastName    = lastName;}
+  if (dateOfBirth !== undefined) {userProfileData.dateOfBirth = dateOfBirth;}
+  if (avatarUrl !== undefined)   {userProfileData.avatarUrl   = avatarUrl;}
 
   const userData = {};
-  if (phone !== undefined) userData.phone = phone;
+  if (phone !== undefined) {userData.phone = phone;}
 
   // Transaction: update both tables atomically
   await prisma.$transaction(async (tx) => {

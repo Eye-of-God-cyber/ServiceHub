@@ -52,7 +52,7 @@ const logger = require('../../utils/logger');
  *       503:
  *         description: API is up but database is unreachable
  */
-router.get('/', async (_req, res, next) => {
+router.get('/', async (_req, res) => {
   try {
     // Ping the database with the lightest possible query
     await prisma.$queryRaw`SELECT 1`;

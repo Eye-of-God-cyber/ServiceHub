@@ -60,7 +60,6 @@ const handleJwtError = () =>
   new AppError('Invalid or expired token. Please log in again.', StatusCodes.UNAUTHORIZED);
 
 // ─── Global Error Handler ─────────────────────────────────
-// eslint-disable-next-line no-unused-vars
 const errorHandler = (err, req, res, _next) => {
   let error = err;
 

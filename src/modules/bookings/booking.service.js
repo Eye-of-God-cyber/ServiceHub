@@ -76,7 +76,7 @@ const getBookingById = async (userId, userRoles, bookingId) => {
     throw new AppError('Booking not found', StatusCodes.NOT_FOUND);
   }
 
-  if (userRoles.includes('ADMIN')) return booking;
+  if (userRoles.includes('ADMIN')) {return booking;}
 
   let isOwner = false;
   if (userRoles.includes('CUSTOMER') && booking.customerId === userId) {
@@ -100,7 +100,7 @@ const createBooking = async (customerId, payload) => {
   const { providerServiceId, addressId, scheduledAt, notes, couponId } = payload;
 
   const address = await prisma.address.findUnique({ where: { id: addressId } });
-  if (!address) throw new AppError('Address not found', StatusCodes.NOT_FOUND);
+  if (!address) {throw new AppError('Address not found', StatusCodes.NOT_FOUND);}
   if (address.userId !== customerId) {
     throw new AppError('You do not have permission to use this address', StatusCodes.FORBIDDEN);
   }
@@ -110,17 +110,17 @@ const createBooking = async (customerId, payload) => {
     include: { service: true }
   });
 
-  if (!ps) throw new AppError('Provider service not found', StatusCodes.NOT_FOUND);
+  if (!ps) {throw new AppError('Provider service not found', StatusCodes.NOT_FOUND);}
   if (!ps.isAvailable || !ps.service.isActive) {
     throw new AppError('This service is currently unavailable', StatusCodes.UNPROCESSABLE_ENTITY);
   }
 
-  let baseAmount = ps.customPrice !== null ? new Decimal(ps.customPrice) : new Decimal(ps.service.basePrice);
+  const baseAmount = ps.customPrice !== null ? new Decimal(ps.customPrice) : new Decimal(ps.service.basePrice);
   let discountAmount = new Decimal(0);
 
   if (couponId) {
     const coupon = await prisma.coupon.findUnique({ where: { id: couponId } });
-    if (!coupon) throw new AppError('Coupon not found', StatusCodes.NOT_FOUND);
+    if (!coupon) {throw new AppError('Coupon not found', StatusCodes.NOT_FOUND);}
     
     const now = new Date();
     if (coupon.status !== 'ACTIVE' || coupon.validFrom > now || coupon.validUntil < now) {
@@ -202,11 +202,11 @@ const updateBookingStatus = async (userId, userRoles, bookingId, payload) => {
   let isCustomer = false;
   let isProvider = false;
   
-  if (userRoles.includes('CUSTOMER') && booking.customerId === userId) isCustomer = true;
+  if (userRoles.includes('CUSTOMER') && booking.customerId === userId) {isCustomer = true;}
   
   if (userRoles.includes('PROVIDER') && !isCustomer) {
     const providerId = await getProviderId(userId);
-    if (providerId && booking.providerId === providerId) isProvider = true;
+    if (providerId && booking.providerId === providerId) {isProvider = true;}
   }
 
   // Define allowed transitions
@@ -226,16 +226,16 @@ const updateBookingStatus = async (userId, userRoles, bookingId, payload) => {
 
     if (isCustomer) {
       if (status === 'CANCELLED') {
-        if (current !== 'PENDING' && current !== 'CONFIRMED') invalidTransition();
+        if (current !== 'PENDING' && current !== 'CONFIRMED') {invalidTransition();}
       } else {
         invalidTransition();
       }
     } else if (isProvider) {
-      if (status === 'CONFIRMED' && current !== 'PENDING') invalidTransition();
-      if (status === 'IN_PROGRESS' && current !== 'CONFIRMED') invalidTransition();
-      if (status === 'COMPLETED' && current !== 'IN_PROGRESS') invalidTransition();
-      if (status === 'NO_SHOW' && current !== 'IN_PROGRESS') invalidTransition();
-      if (status === 'CANCELLED' && current !== 'PENDING' && current !== 'CONFIRMED') invalidTransition();
+      if (status === 'CONFIRMED' && current !== 'PENDING') {invalidTransition();}
+      if (status === 'IN_PROGRESS' && current !== 'CONFIRMED') {invalidTransition();}
+      if (status === 'COMPLETED' && current !== 'IN_PROGRESS') {invalidTransition();}
+      if (status === 'NO_SHOW' && current !== 'IN_PROGRESS') {invalidTransition();}
+      if (status === 'CANCELLED' && current !== 'PENDING' && current !== 'CONFIRMED') {invalidTransition();}
     }
   }
 

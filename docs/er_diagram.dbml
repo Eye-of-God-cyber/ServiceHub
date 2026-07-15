@@ -1,0 +1,282 @@
+﻿// ServiceHub — Entity Relationship Diagram (DBML)
+// Database: PostgreSQL 16 | ORM: Prisma 5.x
+// Source of truth: prisma/schema.prisma
+
+Project ServiceHub {
+  database_type: 'PostgreSQL'
+  Note: 'Multi-Vendor Home Services Marketplace REST API'
+}
+
+// ── AUTH & IDENTITY ─────────────────────────────────────────────
+Table roles {
+  id         Int      [pk, increment]
+  name       RoleName [unique, note: 'CUSTOMER | PROVIDER | ADMIN']
+  created_at DateTime [default: `now()`]
+}
+Table users {
+  id            String     [pk, note: 'UUID']
+  email         String     [unique]
+  phone         String     [unique]
+  password_hash String
+  status        UserStatus [default: 'ACTIVE']
+  is_verified   Boolean    [default: false]
+  created_at    DateTime   [default: `now()`]
+  updated_at    DateTime
+}
+Table user_roles {
+  id         Int      [pk, increment]
+  user_id    String   [ref: > users.id]
+  role_id    Int      [ref: > roles.id]
+  created_at DateTime [default: `now()`]
+  indexes { (user_id, role_id) [unique] }
+}
+Table user_profiles {
+  id            Int      [pk, increment]
+  user_id       String   [unique, ref: > users.id]
+  first_name    String
+  last_name     String
+  avatar_url    String   [null]
+  date_of_birth Date     [null]
+  created_at    DateTime [default: `now()`]
+  updated_at    DateTime
+}
+Table otp_verifications {
+  id         Int        [pk, increment]
+  user_id    String     [ref: > users.id]
+  otp        String
+  purpose    OtpPurpose [note: 'EMAIL_VERIFICATION | PHONE_VERIFICATION | PASSWORD_RESET']
+  is_used    Boolean    [default: false]
+  expires_at DateTime
+  created_at DateTime   [default: `now()`]
+}
+// ── ADDRESSES ───────────────────────────────────────────────────
+Table addresses {
+  id         Int      [pk, increment]
+  user_id    String   [ref: > users.id]
+  label      String   [null]
+  line1      String
+  line2      String   [null]
+  city       String
+  state      String
+  pincode    String
+  latitude   Decimal  [null, note: 'Decimal(10,7)']
+  longitude  Decimal  [null, note: 'Decimal(10,7)']
+  is_default Boolean  [default: false]
+  created_at DateTime [default: `now()`]
+  updated_at DateTime
+}
+// ── PROVIDER OPERATIONS ─────────────────────────────────────────
+Table provider_profiles {
+  id                  Int                [pk, increment]
+  user_id             String             [unique, ref: > users.id]
+  bio                 String             [null]
+  experience_years    Int                [default: 0]
+  verification_status VerificationStatus [default: 'PENDING']
+  avg_rating          Decimal            [default: 0.00, note: 'Decimal(3,2) denormalized']
+  total_reviews       Int                [default: 0]
+  total_bookings      Int                [default: 0]
+  is_available        Boolean            [default: true]
+  created_at          DateTime           [default: `now()`]
+  updated_at          DateTime
+}
+Table provider_documents {
+  id            Int                [pk, increment]
+  provider_id   Int                [ref: > provider_profiles.id]
+  document_type DocumentType
+  document_url  String
+  status        VerificationStatus [default: 'PENDING']
+  admin_notes   String             [null]
+  reviewed_at   DateTime           [null]
+  created_at    DateTime           [default: `now()`]
+  updated_at    DateTime
+}
+Table provider_availability {
+  id           Int       [pk, increment]
+  provider_id  Int       [ref: > provider_profiles.id]
+  day_of_week  DayOfWeek
+  start_time   String    [note: 'HH:MM 24h']
+  end_time     String    [note: 'HH:MM 24h']
+  is_available Boolean   [default: true]
+  created_at   DateTime  [default: `now()`]
+  updated_at   DateTime
+  indexes { (provider_id, day_of_week) [unique] }
+}
+Table provider_time_off {
+  id          Int      [pk, increment]
+  provider_id Int      [ref: > provider_profiles.id]
+  start_date  Date
+  end_date    Date
+  reason      String   [null]
+  created_at  DateTime [default: `now()`]
+}
+// ── SERVICE CATALOG ─────────────────────────────────────────────
+Table service_categories {
+  id          Int      [pk, increment]
+  name        String   [unique]
+  description String   [null]
+  icon_url    String   [null]
+  is_active   Boolean  [default: true]
+  sort_order  Int      [default: 0]
+  created_at  DateTime [default: `now()`]
+  updated_at  DateTime
+}
+Table services {
+  id          Int      [pk, increment]
+  category_id Int      [ref: > service_categories.id]
+  name        String
+  description String   [null]
+  base_price  Decimal  [note: 'Decimal(10,2)']
+  unit        String   [null]
+  image_url   String   [null]
+  is_active   Boolean  [default: true]
+  created_at  DateTime [default: `now()`]
+  updated_at  DateTime
+}
+Table provider_services {
+  id           Int      [pk, increment]
+  provider_id  Int      [ref: > provider_profiles.id]
+  service_id   Int      [ref: > services.id]
+  custom_price Decimal  [null]
+  is_available Boolean  [default: true]
+  description  String   [null]
+  created_at   DateTime [default: `now()`]
+  updated_at   DateTime
+  indexes { (provider_id, service_id) [unique] }
+}
+// ── BOOKING LIFECYCLE ───────────────────────────────────────────
+Table bookings {
+  id                  Int           [pk, increment]
+  customer_id         String        [ref: > users.id]
+  provider_id         Int           [ref: > provider_profiles.id]
+  service_id          Int           [ref: > services.id]
+  provider_service_id Int           [ref: > provider_services.id]
+  address_id          Int           [ref: > addresses.id]
+  coupon_id           Int           [null, ref: > coupons.id]
+  status              BookingStatus [default: 'PENDING']
+  scheduled_at        DateTime
+  completed_at        DateTime      [null]
+  base_amount         Decimal       [note: 'Decimal(10,2) immutable snapshot']
+  discount_amount     Decimal       [default: 0.00]
+  total_amount        Decimal
+  notes               String        [null]
+  cancellation_reason String        [null]
+  created_at          DateTime      [default: `now()`]
+  updated_at          DateTime
+}
+Table booking_status_history {
+  id            Int           [pk, increment]
+  booking_id    Int           [ref: > bookings.id]
+  status        BookingStatus
+  changed_by_id String        [null, ref: > users.id]
+  reason        String        [null]
+  created_at    DateTime      [default: `now()`]
+  Note: 'Append-only audit trail — no updated_at by design'
+}
+// ── FINANCIAL SYSTEM ────────────────────────────────────────────
+Table wallets {
+  id         Int      [pk, increment]
+  user_id    String   [unique, ref: > users.id]
+  balance    Decimal  [default: 0.00]
+  created_at DateTime [default: `now()`]
+  updated_at DateTime
+}
+Table wallet_transactions {
+  id             Int      [pk, increment]
+  wallet_id      Int      [ref: > wallets.id]
+  type           TxnType  [note: 'CREDIT | DEBIT']
+  amount         Decimal
+  status         TxnStatus [default: 'PENDING']
+  description    String   [null]
+  booking_id     Int      [null, ref: > bookings.id]
+  balance_before Decimal
+  balance_after  Decimal
+  created_at     DateTime [default: `now()`]
+  Note: 'Immutable ledger — no updated_at by design'
+}
+Table payments {
+  id               Int           [pk, increment]
+  booking_id       Int           [ref: > bookings.id]
+  transaction_ref  String        [unique]
+  amount           Decimal
+  method           PaymentMethod
+  status           PaymentStatus [default: 'PENDING']
+  gateway_response Json          [null]
+  paid_at          DateTime      [null]
+  created_at       DateTime      [default: `now()`]
+  updated_at       DateTime
+}
+Table coupons {
+  id              Int          [pk, increment]
+  code            String       [unique]
+  type            CouponType   [note: 'PERCENTAGE | FLAT']
+  discount_value  Decimal
+  max_discount    Decimal      [null]
+  min_order_value Decimal      [null]
+  max_usage       Int          [null]
+  usage_count     Int          [default: 0]
+  per_user_limit  Int          [default: 1]
+  status          CouponStatus [default: 'ACTIVE']
+  valid_from      DateTime
+  valid_until     DateTime
+  created_at      DateTime     [default: `now()`]
+  updated_at      DateTime
+}
+Table coupon_usages {
+  id         Int      [pk, increment]
+  coupon_id  Int      [ref: > coupons.id]
+  user_id    String   [ref: > users.id]
+  booking_id Int      [unique, ref: > bookings.id]
+  used_at    DateTime [default: `now()`]
+  indexes { (coupon_id, user_id) }
+}
+// ── REVIEWS ─────────────────────────────────────────────────────
+Table reviews {
+  id          Int      [pk, increment]
+  booking_id  Int      [unique, ref: > bookings.id]
+  customer_id String   [ref: > users.id]
+  provider_id Int      [ref: > provider_profiles.id]
+  rating      Int      [note: '1-5']
+  comment     String   [null]
+  created_at  DateTime [default: `now()`]
+  updated_at  DateTime
+}
+Table review_replies {
+  id          Int      [pk, increment]
+  review_id   Int      [unique, ref: > reviews.id]
+  provider_id Int      [ref: > provider_profiles.id]
+  comment     String
+  created_at  DateTime [default: `now()`]
+  updated_at  DateTime
+}
+// ── DISPUTES & SUPPORT ──────────────────────────────────────────
+Table disputes {
+  id           Int           [pk, increment]
+  booking_id   Int           [ref: > bookings.id]
+  raised_by_id String        [ref: > users.id]
+  subject      String
+  description  String
+  status       DisputeStatus [default: 'OPEN']
+  resolved_at  DateTime      [null]
+  resolution   String        [null]
+  created_at   DateTime      [default: `now()`]
+  updated_at   DateTime
+}
+Table dispute_messages {
+  id         Int      [pk, increment]
+  dispute_id Int      [ref: > disputes.id]
+  sender_id  String   [ref: > users.id]
+  message    String
+  created_at DateTime [default: `now()`]
+}
+// ── NOTIFICATIONS ───────────────────────────────────────────────
+Table notifications {
+  id         Int      [pk, increment]
+  user_id    String   [ref: > users.id]
+  type       NotifType
+  title      String
+  body       String
+  is_read    Boolean  [default: false]
+  data       Json     [null]
+  created_at DateTime [default: `now()`]
+  indexes { (user_id, is_read) }
+}

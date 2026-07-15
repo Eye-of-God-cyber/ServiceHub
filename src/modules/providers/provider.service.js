@@ -140,14 +140,14 @@ const updateProviderProfile = async (userId, payload) => {
 
   // Build sparse update objects — only write fields that were actually supplied
   const providerData = {};
-  if (bio               !== undefined) providerData.bio             = bio;
-  if (experienceYears   !== undefined) providerData.experienceYears = experienceYears;
-  if (isAvailable       !== undefined) providerData.isAvailable     = isAvailable;
+  if (bio               !== undefined) {providerData.bio             = bio;}
+  if (experienceYears   !== undefined) {providerData.experienceYears = experienceYears;}
+  if (isAvailable       !== undefined) {providerData.isAvailable     = isAvailable;}
 
   const userProfileData = {};
-  if (firstName !== undefined) userProfileData.firstName = firstName;
-  if (lastName  !== undefined) userProfileData.lastName  = lastName;
-  if (avatarUrl !== undefined) userProfileData.avatarUrl = avatarUrl;
+  if (firstName !== undefined) {userProfileData.firstName = firstName;}
+  if (lastName  !== undefined) {userProfileData.lastName  = lastName;}
+  if (avatarUrl !== undefined) {userProfileData.avatarUrl = avatarUrl;}
 
   // Atomic update across both tables
   await prisma.$transaction(async (tx) => {

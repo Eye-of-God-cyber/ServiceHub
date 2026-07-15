@@ -19,7 +19,8 @@
     "no-var": "error",
     "prefer-const": "error",
     "eqeqeq": ["error", "always"],
-    "curly": ["error", "all"],
+    "curly": ["error", "multi-line"],
+    "no-process-exit": "off",
     "node/no-unsupported-features/es-syntax": "off",
     "node/no-missing-require": "error",
     "node/no-extraneous-require": "error"

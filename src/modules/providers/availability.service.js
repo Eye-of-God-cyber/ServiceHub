@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 
 const getProviderId = async (userId) => {
   const pp = await prisma.providerProfile.findUnique({ where: { userId }, select: { id: true } });
-  if (!pp) throw new AppError('Provider profile not found.', StatusCodes.NOT_FOUND);
+  if (!pp) {throw new AppError('Provider profile not found.', StatusCodes.NOT_FOUND);}
   return pp.id;
 };
 

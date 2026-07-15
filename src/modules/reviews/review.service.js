@@ -22,8 +22,8 @@ const REVIEW_INCLUDE = {
 
 const getReviews = async (filters = {}) => {
   const where = {};
-  if (filters.providerId) where.providerId = filters.providerId;
-  if (filters.customerId) where.customerId = filters.customerId;
+  if (filters.providerId) {where.providerId = filters.providerId;}
+  if (filters.customerId) {where.customerId = filters.customerId;}
 
   const { page, limit, skip, take } = getPaginationOptions(filters);
 
@@ -46,13 +46,13 @@ const createReview = async (customerId, payload) => {
 
   // 1. Verify booking exists, is owned by customer, and is COMPLETED
   const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
-  if (!booking) throw new AppError('Booking not found', StatusCodes.NOT_FOUND);
-  if (booking.customerId !== customerId) throw new AppError('You do not have permission to review this booking', StatusCodes.FORBIDDEN);
-  if (booking.status !== 'COMPLETED') throw new AppError('Only completed bookings can be reviewed', StatusCodes.UNPROCESSABLE_ENTITY);
+  if (!booking) {throw new AppError('Booking not found', StatusCodes.NOT_FOUND);}
+  if (booking.customerId !== customerId) {throw new AppError('You do not have permission to review this booking', StatusCodes.FORBIDDEN);}
+  if (booking.status !== 'COMPLETED') {throw new AppError('Only completed bookings can be reviewed', StatusCodes.UNPROCESSABLE_ENTITY);}
 
   // 2. Check if already reviewed (handled by schema @unique on bookingId, but good to catch early)
   const existing = await prisma.review.findUnique({ where: { bookingId } });
-  if (existing) throw new AppError('You have already reviewed this booking', StatusCodes.CONFLICT);
+  if (existing) {throw new AppError('You have already reviewed this booking', StatusCodes.CONFLICT);}
 
   // 3. Create Review and update Provider stats in a transaction
   return prisma.$transaction(async (tx) => {
@@ -88,12 +88,12 @@ const createReview = async (customerId, payload) => {
 
 const createReviewReply = async (userId, reviewId, payload) => {
   const providerId = await getProviderId(userId);
-  if (!providerId) throw new AppError('Provider profile not found', StatusCodes.FORBIDDEN);
+  if (!providerId) {throw new AppError('Provider profile not found', StatusCodes.FORBIDDEN);}
 
   const review = await prisma.review.findUnique({ where: { id: reviewId }, include: { reply: true } });
-  if (!review) throw new AppError('Review not found', StatusCodes.NOT_FOUND);
-  if (review.providerId !== providerId) throw new AppError('You can only reply to reviews on your own profile', StatusCodes.FORBIDDEN);
-  if (review.reply) throw new AppError('You have already replied to this review', StatusCodes.CONFLICT);
+  if (!review) {throw new AppError('Review not found', StatusCodes.NOT_FOUND);}
+  if (review.providerId !== providerId) {throw new AppError('You can only reply to reviews on your own profile', StatusCodes.FORBIDDEN);}
+  if (review.reply) {throw new AppError('You have already replied to this review', StatusCodes.CONFLICT);}
 
   return prisma.reviewReply.create({
     data: {

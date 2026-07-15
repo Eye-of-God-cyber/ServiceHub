@@ -15,15 +15,15 @@ const DOC_SELECT = {
 // Resolve providerId from userId
 const getProviderId = async (userId) => {
   const pp = await prisma.providerProfile.findUnique({ where: { userId }, select: { id: true } });
-  if (!pp) throw new AppError('Provider profile not found.', StatusCodes.NOT_FOUND);
+  if (!pp) {throw new AppError('Provider profile not found.', StatusCodes.NOT_FOUND);}
   return pp.id;
 };
 
 // Assert ownership: document must belong to this provider
 const assertDocumentOwnership = async (docId, providerId) => {
   const doc = await prisma.providerDocument.findUnique({ where: { id: docId }, select: { id: true, providerId: true } });
-  if (!doc) throw new AppError('Document not found.', StatusCodes.NOT_FOUND);
-  if (doc.providerId !== providerId) throw new AppError('You do not have permission to access this document.', StatusCodes.FORBIDDEN);
+  if (!doc) {throw new AppError('Document not found.', StatusCodes.NOT_FOUND);}
+  if (doc.providerId !== providerId) {throw new AppError('You do not have permission to access this document.', StatusCodes.FORBIDDEN);}
   return doc;
 };
 
