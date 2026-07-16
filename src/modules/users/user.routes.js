@@ -22,7 +22,40 @@ const allRoles = [ROLES.ADMIN, ROLES.PROVIDER, ROLES.CUSTOMER];
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile Routes
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * @swagger
+ * /users/profile:
+ *   get:
+ *     summary: GET /users/profile
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ */
 router.get('/profile', authenticate, authorize(...allRoles), userController.getProfile);
+
+/**
+ * @swagger
+ * /users/profile:
+ *   put:
+ *     summary: PUT /users/profile
+ *     tags: [Users]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successful operation
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ */
 router.put('/profile', authenticate, authorize(...allRoles), updateProfileValidation, validate, userController.updateProfile);
 
 // ─────────────────────────────────────────────────────────────────────────────

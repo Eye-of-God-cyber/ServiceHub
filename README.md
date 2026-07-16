@@ -303,16 +303,18 @@ CREATE INDEX ON coupons (status);
 
 ## 4. ER Diagram
 
-> **The ER diagram has not yet been generated for this repository.**
->
-> **Recommended tool:** [dbdiagram.io](https://dbdiagram.io) — paste the Prisma schema, configure relationships, export as PNG.
->
-> **Target location:** `docs/er_diagram.png`
->
-> Once exported, add it to the README with:
-> ```markdown
-> ![ServiceHub ER Diagram](docs/er_diagram.png)
-> ```
+The following Entity Relationship Diagram represents the complete ServiceHub database schema, including all tables, primary keys, foreign keys, and relationships.
+
+<p align="center">
+  <img src="./docs/er_diagram.png"
+       alt="ServiceHub ER Diagram"
+       width="100%">
+</p>
+
+For a scalable vector version suitable for printing and zooming, see:
+
+- 📄 `docs/er_diagram.pdf`
+- 🗂️ `docs/er_diagram.dbml`
 
 ### Entity Relationship Summary
 

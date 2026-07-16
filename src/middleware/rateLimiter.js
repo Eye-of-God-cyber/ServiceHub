@@ -21,6 +21,7 @@ const AppError = require('../utils/AppError');
 const globalLimiter = rateLimit({
   windowMs: config.rateLimit.windowMinutes * 60 * 1000,
   max: config.rateLimit.maxRequests,
+  skip: (req) => req.originalUrl === '/api/v1/health',
   standardHeaders: true, // Return `RateLimit-*` headers
   legacyHeaders: false,  // Disable deprecated `X-RateLimit-*` headers
   handler: (_req, _res, next) => {
