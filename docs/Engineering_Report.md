@@ -195,8 +195,8 @@ Pattern: Layered MVC — Routes (thin) > Controller (thin) > Service (business l
 | Deployment Guide | /docs/Deployment_Guide.md |
 | Environment Guide | /docs/Environment_Guide.md |
 | This Report | /docs/Engineering_Report.md |
-| Swagger UI | http://localhost:5000/api-docs |
-| OpenAPI JSON | http://localhost:5000/api-docs.json |
+| Swagger UI | https://servicehub-api-13vx.onrender.com/api-docs/ |
+| OpenAPI JSON | https://servicehub-api-13vx.onrender.com/api-docs.json |
 
 ---
 *ServiceHub Engineering Team — v1.0.0 — Released 2026-07-15*

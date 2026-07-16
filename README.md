@@ -8,7 +8,7 @@
 [![Express](https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white)](https://expressjs.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
 [![Prisma](https://img.shields.io/badge/Prisma_ORM-5.x-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
-[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-6BA539?logo=swagger&logoColor=white)](http://localhost:5000/api-docs)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-6BA539?logo=swagger&logoColor=white)](https://servicehub-api-13vx.onrender.com/api-docs/)
 [![License](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 
 ServiceHub is a production-grade backend system that powers a multi-vendor home services marketplace — connecting customers with verified service professionals for on-demand doorstep services such as plumbing, electrical work, deep cleaning, AC servicing, and carpentry.
@@ -16,6 +16,18 @@ ServiceHub is a production-grade backend system that powers a multi-vendor home 
 **Core demonstration:** Relational database engineering · PostgreSQL · Prisma ORM · JWT authentication · Role-based access control · REST API design · Backend security patterns · Concurrent-safe transactions
 
 </div>
+
+---
+
+## 🌐 Live API Documentation
+
+**Swagger UI**
+
+https://servicehub-api-13vx.onrender.com/api-docs/
+
+**OpenAPI JSON**
+
+https://servicehub-api-13vx.onrender.com/api-docs.json
 
 ---
 
@@ -423,7 +435,7 @@ reviews ────────────────────────
 
 ## 6. REST API Reference
 
-**Base URL:** `http://localhost:5000/api/v1`
+**Base URL:** `https://servicehub-api-13vx.onrender.com/api/v1`
 
 All protected routes require:
 ```
@@ -551,8 +563,8 @@ ServiceHub ships with a fully interactive OpenAPI 3.0.3 specification generated 
 
 | URL | Purpose |
 |-----|---------|
-| `http://localhost:5000/api-docs` | Swagger UI (interactive) |
-| `http://localhost:5000/api-docs.json` | Raw OpenAPI 3.0.3 JSON spec |
+| `https://servicehub-api-13vx.onrender.com/api-docs/` | Swagger UI (interactive) |
+| `https://servicehub-api-13vx.onrender.com/api-docs.json` | Raw OpenAPI 3.0.3 JSON spec |
 
 **Features:**
 - **Authorize button** — enter your JWT access token once to authenticate all subsequent requests
@@ -973,7 +985,7 @@ railway run npx prisma migrate deploy
 
 ```bash
 # Register as a customer
-curl -X POST http://localhost:5000/api/v1/auth/register \
+curl -X POST https://servicehub-api-13vx.onrender.com/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "arjun.mehta@example.com",
@@ -985,7 +997,7 @@ curl -X POST http://localhost:5000/api/v1/auth/register \
   }'
 
 # Login
-curl -X POST http://localhost:5000/api/v1/auth/login \
+curl -X POST https://servicehub-api-13vx.onrender.com/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "arjun.mehta@example.com", "password": "SecurePass@123"}'
 
@@ -997,13 +1009,13 @@ TOKEN="<accessToken from login response>"
 
 ```bash
 # Browse categories (public — no auth required)
-curl http://localhost:5000/api/v1/catalog/categories
+curl https://servicehub-api-13vx.onrender.com/api/v1/catalog/categories
 
 # Browse plumbing services
-curl "http://localhost:5000/api/v1/catalog/services?categoryId=1"
+curl "https://servicehub-api-13vx.onrender.com/api/v1/catalog/services?categoryId=1"
 
 # Add a service address
-curl -X POST http://localhost:5000/api/v1/users/addresses \
+curl -X POST https://servicehub-api-13vx.onrender.com/api/v1/users/addresses \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1015,7 +1027,7 @@ curl -X POST http://localhost:5000/api/v1/users/addresses \
   }'
 
 # Create a booking
-curl -X POST http://localhost:5000/api/v1/bookings \
+curl -X POST https://servicehub-api-13vx.onrender.com/api/v1/bookings \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1029,25 +1041,25 @@ curl -X POST http://localhost:5000/api/v1/bookings \
 ### Provider Accepts, Works, and Completes
 
 ```bash
-PTOKEN=$(curl -s -X POST http://localhost:5000/api/v1/auth/login \
+PTOKEN=$(curl -s -X POST https://servicehub-api-13vx.onrender.com/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"rajesh.kumar@gmail.com","password":"Password@123"}' \
   | node -e "process.stdin.on('data',d=>process.stdout.write(JSON.parse(d).data.accessToken))")
 
 # Confirm the booking
-curl -X PATCH http://localhost:5000/api/v1/bookings/1/status \
+curl -X PATCH https://servicehub-api-13vx.onrender.com/api/v1/bookings/1/status \
   -H "Authorization: Bearer $PTOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "CONFIRMED"}'
 
 # Mark in progress
-curl -X PATCH http://localhost:5000/api/v1/bookings/1/status \
+curl -X PATCH https://servicehub-api-13vx.onrender.com/api/v1/bookings/1/status \
   -H "Authorization: Bearer $PTOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "IN_PROGRESS"}'
 
 # Mark complete
-curl -X PATCH http://localhost:5000/api/v1/bookings/1/status \
+curl -X PATCH https://servicehub-api-13vx.onrender.com/api/v1/bookings/1/status \
   -H "Authorization: Bearer $PTOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "COMPLETED"}'
@@ -1056,7 +1068,7 @@ curl -X PATCH http://localhost:5000/api/v1/bookings/1/status \
 ### Submit a Review
 
 ```bash
-curl -X POST http://localhost:5000/api/v1/reviews \
+curl -X POST https://servicehub-api-13vx.onrender.com/api/v1/reviews \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1069,12 +1081,12 @@ curl -X POST http://localhost:5000/api/v1/reviews \
 ### Admin Approves a Provider Document
 
 ```bash
-ATOKEN=$(curl -s -X POST http://localhost:5000/api/v1/auth/login \
+ATOKEN=$(curl -s -X POST https://servicehub-api-13vx.onrender.com/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@servicehub.app","password":"Password@123"}' \
   | node -e "process.stdin.on('data',d=>process.stdout.write(JSON.parse(d).data.accessToken))")
 
-curl -X PATCH http://localhost:5000/api/v1/admin/documents/3/status \
+curl -X PATCH https://servicehub-api-13vx.onrender.com/api/v1/admin/documents/3/status \
   -H "Authorization: Bearer $ATOKEN" \
   -H "Content-Type: application/json" \
   -d '{"status": "APPROVED", "adminNotes": "ID verified — clear copy received."}'

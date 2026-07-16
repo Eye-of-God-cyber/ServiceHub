@@ -2,7 +2,7 @@
 
 This guide helps frontend developers integrate with the ServiceHub REST API.
 
-Base URL: `http://localhost:5000/api/v1` (dev) | `https://api.servicehub.app/api/v1` (prod)  
+Base URL: `https://servicehub-api-13vx.onrender.com/api/v1`  
 Swagger UI: `/api-docs`
 
 ---

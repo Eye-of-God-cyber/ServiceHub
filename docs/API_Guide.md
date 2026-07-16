@@ -2,7 +2,7 @@
 
 This document is the complete API documentation for frontend developers integrating with the ServiceHub backend.
 
-**Base URL**: `http://localhost:5000/api/v1` (dev) | `https://api.servicehub.app/api/v1` (prod)  
+**Base URL**: `https://servicehub-api-13vx.onrender.com/api/v1`  
 **Content-Type**: `application/json`  
 **Authentication**: `Authorization: Bearer <token>`
 
