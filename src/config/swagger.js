@@ -20,21 +20,32 @@ const swaggerDefinition = {
     version: '1.0.0',
     description:
       'REST API documentation for the ServiceHub Multi-Vendor Home Services Marketplace.\n\n' +
-      '## How to Authenticate\n\n' +
-      '1. Use **POST /auth/login** with one of the seeded accounts below.\n' +
-      '2. Copy the `accessToken` from the response body.\n' +
-      '3. Click the **Authorize 🔓** button at the top-right.\n' +
-      '4. Paste **only the token** (no `Bearer ` prefix) and click Authorize.\n' +
-      '5. All protected endpoints will now work.\n\n' +
-      '## Seeded Test Accounts (all share the same password)\n\n' +
-      '| Role | Email | Password |\n' +
-      '|------|-------|----------|\n' +
-      '| ADMIN | admin@servicehub.app | Password@123 |\n' +
-      '| CUSTOMER | amit.gupta@gmail.com | Password@123 |\n' +
-      '| CUSTOMER | neha.singh@gmail.com | Password@123 |\n' +
-      '| PROVIDER | rajesh.kumar@gmail.com | Password@123 |\n' +
-      '| PROVIDER | suresh.patel@gmail.com | Password@123 |\n\n' +
-      '> All protected endpoints require a Bearer token in the Authorization header.',
+      '---\n\n' +
+      '## ⚡ Quick Start — How to Test Any Endpoint\n\n' +
+      '### Step 1 — Login and get your token\n\n' +
+      'Expand **POST /auth/login** → click **Try it out** → click **Execute**.\n' +
+      'Copy the **`accessToken`** value from the response body (just the long string, nothing else).\n\n' +
+      '### Step 2 — Authorize Swagger\n\n' +
+      'Click the **Authorize 🔓** button at the top of this page.\n' +
+      'In the **BearerAuth** box, paste your token (**without** the word `Bearer`).\n' +
+      'Click **Authorize** then **Close**.\n\n' +
+      '### Step 3 — Use any endpoint\n\n' +
+      'The 🔒 lock icon on each endpoint will now appear closed. Click **Try it out** → fill the fields → **Execute**.\n\n' +
+      '---\n\n' +
+      '## 🔑 Seeded Test Accounts\n\n' +
+      '> **Important:** Log in with the account that matches the role required by the endpoint you want to test.\n\n' +
+      '| Role | Email | Password | Use For |\n' +
+      '|------|-------|----------|---------|\n' +
+      '| **ADMIN** | `admin@servicehub.app` | `Password@123` | Admin endpoints |\n' +
+      '| **CUSTOMER** | `amit.gupta@gmail.com` | `Password@123` | Bookings, Reviews, Disputes |\n' +
+      '| **CUSTOMER** | `neha.singh@gmail.com` | `Password@123` | Alternate customer |\n' +
+      '| **PROVIDER** | `rajesh.kumar@gmail.com` | `Password@123` | Provider profile, services, availability |\n' +
+      '| **PROVIDER** | `suresh.patel@gmail.com` | `Password@123` | Alternate provider |\n\n' +
+      '## ⚠️ Role Errors (403 Forbidden)\n\n' +
+      'If you get **403 Forbidden**, you are using the wrong role.\n' +
+      'Example: `PUT /providers/me` requires **PROVIDER** — log in as `rajesh.kumar@gmail.com`.\n' +
+      'Example: `POST /bookings` requires **CUSTOMER** — log in as `amit.gupta@gmail.com`.\n' +
+      'Example: `PATCH /admin/...` requires **ADMIN** — log in as `admin@servicehub.app`.',
     contact: {
       name: 'ServiceHub Engineering',
       email: 'engineering@servicehub.app',

@@ -17,6 +17,7 @@ const { ROLES } = require('../../config/roles');
  * /bookings:
  *   post:
  *     summary: Create a new booking (CUSTOMER only)
+ *     description: "🔒 Requires **CUSTOMER** role. Login as `amit.gupta@gmail.com` / `Password@123`"
  *     tags: [Bookings]
  *     security:
  *       - BearerAuth: []
@@ -69,6 +70,7 @@ router.post(
  * /bookings:
  *   get:
  *     summary: Get all bookings for the authenticated user
+ *     description: "🔒 Requires **CUSTOMER**, **PROVIDER**, or **ADMIN** role."
  *     tags: [Bookings]
  *     security:
  *       - BearerAuth: []
@@ -102,6 +104,7 @@ router.get(
  * /bookings/{bookingId}:
  *   get:
  *     summary: Get a single booking by ID
+ *     description: "🔒 Requires **CUSTOMER**, **PROVIDER**, or **ADMIN** role."
  *     tags: [Bookings]
  *     security:
  *       - BearerAuth: []
@@ -137,6 +140,7 @@ router.get(
  * /bookings/{bookingId}/status:
  *   patch:
  *     summary: Update the status of a booking
+ *     description: "🔒 Requires **CUSTOMER**, **PROVIDER**, or **ADMIN** role. PROVIDER confirms/completes; CUSTOMER cancels."
  *     tags: [Bookings]
  *     security:
  *       - BearerAuth: []

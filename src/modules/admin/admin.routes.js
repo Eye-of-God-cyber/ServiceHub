@@ -19,6 +19,7 @@ router.use(authenticate, authorize(ROLES.ADMIN));
  * /admin/documents/{docId}/status:
  *   patch:
  *     summary: Approve or reject a provider verification document (ADMIN only)
+ *     description: "🔒 Requires **ADMIN** role. Login as `admin@servicehub.app` / `Password@123`"
  *     tags: [Admin]
  *     security:
  *       - BearerAuth: []
@@ -70,6 +71,7 @@ router.patch(
  * /admin/disputes/{disputeId}/resolve:
  *   patch:
  *     summary: Resolve a dispute with an admin decision (ADMIN only)
+ *     description: "🔒 Requires **ADMIN** role. Login as `admin@servicehub.app` / `Password@123`"
  *     tags: [Admin]
  *     security:
  *       - BearerAuth: []

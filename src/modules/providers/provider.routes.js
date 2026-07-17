@@ -24,6 +24,7 @@ const { StatusCodes } = require('http-status-codes');
  * /providers/me:
  *   get:
  *     summary: Get the authenticated provider's profile
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -50,6 +51,7 @@ router.get(
  * /providers/me:
  *   put:
  *     summary: Update the authenticated provider's profile
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -98,6 +100,7 @@ router.put('/me', authenticate, authorize(ROLES.PROVIDER), updateProviderProfile
  * /providers/documents:
  *   get:
  *     summary: Get all documents submitted by the authenticated provider
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -117,6 +120,7 @@ router.get('/documents', authenticate, authorize(ROLES.PROVIDER), async (req, re
  * /providers/documents:
  *   post:
  *     summary: Submit a new verification document
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -153,6 +157,7 @@ router.post('/documents', authenticate, authorize(ROLES.PROVIDER), createDocumen
  * /providers/documents/{docId}:
  *   delete:
  *     summary: Delete a provider document
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -184,6 +189,7 @@ router.delete('/documents/:docId', authenticate, authorize(ROLES.PROVIDER), docI
  * /providers/availability:
  *   get:
  *     summary: Get the authenticated provider's weekly availability
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -200,6 +206,7 @@ router.get('/availability', authenticate, authorize(ROLES.PROVIDER), availabilit
  * /providers/availability:
  *   put:
  *     summary: Replace the provider's weekly availability schedule
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -253,6 +260,7 @@ router.put('/availability', authenticate, authorize(ROLES.PROVIDER), updateAvail
  * /providers/time-off:
  *   get:
  *     summary: Get all time-off entries for the authenticated provider
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -269,6 +277,7 @@ router.get('/time-off', authenticate, authorize(ROLES.PROVIDER), availabilityCon
  * /providers/time-off:
  *   post:
  *     summary: Create a time-off block for the provider
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -306,6 +315,7 @@ router.post('/time-off', authenticate, authorize(ROLES.PROVIDER), createTimeOffV
  * /providers/time-off/{timeOffId}:
  *   delete:
  *     summary: Delete a time-off entry
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -334,6 +344,7 @@ router.delete('/time-off/:timeOffId', authenticate, authorize(ROLES.PROVIDER), t
  * /providers/services:
  *   get:
  *     summary: Get all services offered by the authenticated provider
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -350,6 +361,7 @@ router.get('/services', authenticate, authorize(ROLES.PROVIDER), psController.ge
  * /providers/services:
  *   post:
  *     summary: Add a catalog service to the provider's offered services
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -388,6 +400,7 @@ router.post('/services', authenticate, authorize(ROLES.PROVIDER), createProvider
  * /providers/services/{providerServiceId}:
  *   put:
  *     summary: Update a provider's offered service
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -429,6 +442,7 @@ router.put('/services/:providerServiceId', authenticate, authorize(ROLES.PROVIDE
  * /providers/services/{providerServiceId}:
  *   delete:
  *     summary: Remove a service from the provider's offerings
+ *     description: "🔒 Requires **PROVIDER** role. Login as `rajesh.kumar@gmail.com` / `Password@123`"
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
