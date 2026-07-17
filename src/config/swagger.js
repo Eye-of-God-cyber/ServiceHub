@@ -29,16 +29,45 @@ const swaggerDefinition = {
       name: 'ISC',
     },
   },
-  servers: [
-    {
-      url: `http://localhost:${config.server.port}/api/v1`,
-      description: 'Local Development Server',
-    },
-    {
-      url: 'https://api.servicehub.app/api/v1',
-      description: 'Production Server',
-    },
-  ],
+  // ─── Servers ──────────────────────────────────────────────
+  //
+  // Swagger UI uses the first entry in this array as the default base URL
+  // when the user clicks "Execute". We build it dynamically so that:
+  //
+  //   • On Render (production): RENDER_EXTERNAL_URL is automatically injected
+  //     by the platform, e.g. "https://servicehub-api-13vx.onrender.com".
+  //     We use that as the single server so "Try it out" calls the live API.
+  //
+  //   • Locally: No RENDER_EXTERNAL_URL is set, so we fall back to
+  //     http://localhost:<PORT>/api/v1.
+  //
+  // Why RENDER_EXTERNAL_URL?
+  //   Render injects this env variable automatically on every deploy —
+  //   no manual configuration needed and it stays correct even if the
+  //   Render subdomain ever changes.
+  //
+  // Why NOT hardcode "api.servicehub.app"?
+  //   That domain is not where the API is actually hosted right now.
+  //   Hardcoding a non-existent domain makes every "Try it out" call fail.
+  // ─────────────────────────────────────────────────────────
+  servers: (() => {
+    if (process.env.RENDER_EXTERNAL_URL) {
+      // Running on Render — use the live public URL only.
+      return [
+        {
+          url: `${process.env.RENDER_EXTERNAL_URL}/api/v1`,
+          description: 'Production Server (Render)',
+        },
+      ];
+    }
+    // Running locally — show both local and production for convenience.
+    return [
+      {
+        url: `http://localhost:${config.server.port}/api/v1`,
+        description: 'Local Development Server',
+      },
+    ];
+  })(),
   // ─── Reusable security scheme ─────────────────────────
   components: {
     securitySchemes: {
