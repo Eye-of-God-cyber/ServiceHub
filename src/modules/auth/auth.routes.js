@@ -15,8 +15,7 @@ const { registerValidation, loginValidation } = require('../../validations/auth.
  *   post:
  *     summary: POST /auth/register
  *     tags: [auth]
- *     security:
- *       - BearerAuth: []
+ *     security: []
  *     responses:
  *       200:
  *         description: Successful operation
@@ -36,8 +35,7 @@ router.post('/register', registerValidation, validate, authController.register);
  *   post:
  *     summary: POST /auth/login
  *     tags: [auth]
- *     security:
- *       - BearerAuth: []
+ *     security: []
  *     responses:
  *       200:
  *         description: Successful operation

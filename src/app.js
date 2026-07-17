@@ -52,7 +52,13 @@ app.use(
       if (!origin) {
         return callback(null, true);
       }
-      if (config.cors.allowedOrigins.includes(origin)) {
+      // In production, also allow the Render deployment origin automatically
+      // so Swagger UI hosted on the same domain can call the API without
+      // needing CORS_ALLOWED_ORIGINS to be manually updated on each redeploy.
+      if (
+        config.cors.allowedOrigins.includes(origin) ||
+        (process.env.RENDER_EXTERNAL_URL && origin === process.env.RENDER_EXTERNAL_URL)
+      ) {
         return callback(null, true);
       }
       return callback(new Error(`CORS: Origin '${origin}' is not allowed.`));
