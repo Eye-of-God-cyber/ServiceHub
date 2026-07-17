@@ -19,8 +19,22 @@ const swaggerDefinition = {
     title: 'ServiceHub API',
     version: '1.0.0',
     description:
-      'REST API documentation for the ServiceHub Multi-Vendor Home Services Marketplace. ' +
-      'All protected endpoints require a Bearer token in the Authorization header.',
+      'REST API documentation for the ServiceHub Multi-Vendor Home Services Marketplace.\n\n' +
+      '## How to Authenticate\n\n' +
+      '1. Use **POST /auth/login** with one of the seeded accounts below.\n' +
+      '2. Copy the `accessToken` from the response body.\n' +
+      '3. Click the **Authorize 🔓** button at the top-right.\n' +
+      '4. Paste **only the token** (no `Bearer ` prefix) and click Authorize.\n' +
+      '5. All protected endpoints will now work.\n\n' +
+      '## Seeded Test Accounts (all share the same password)\n\n' +
+      '| Role | Email | Password |\n' +
+      '|------|-------|----------|\n' +
+      '| ADMIN | admin@servicehub.app | Password@123 |\n' +
+      '| CUSTOMER | amit.gupta@gmail.com | Password@123 |\n' +
+      '| CUSTOMER | neha.singh@gmail.com | Password@123 |\n' +
+      '| PROVIDER | rajesh.kumar@gmail.com | Password@123 |\n' +
+      '| PROVIDER | suresh.patel@gmail.com | Password@123 |\n\n' +
+      '> All protected endpoints require a Bearer token in the Authorization header.',
     contact: {
       name: 'ServiceHub Engineering',
       email: 'engineering@servicehub.app',

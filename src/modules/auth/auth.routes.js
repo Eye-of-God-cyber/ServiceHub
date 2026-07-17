@@ -26,20 +26,20 @@ const { registerValidation, loginValidation } = require('../../validations/auth.
  *             properties:
  *               firstName:
  *                 type: string
- *                 example: Arjun
+ *                 example: Niraj
  *               lastName:
  *                 type: string
- *                 example: Mehta
+ *                 example: Sharma
  *               email:
  *                 type: string
  *                 format: email
- *                 example: arjun.mehta@example.com
+ *                 example: niraj.sharma@example.com
  *               phone:
  *                 type: string
  *                 example: "9876543210"
  *               password:
  *                 type: string
- *                 example: SecurePass@123
+ *                 example: Password@123
  *               role:
  *                 type: string
  *                 enum: [CUSTOMER, PROVIDER]
@@ -75,10 +75,10 @@ router.post('/register', registerValidation, validate, authController.register);
  *               email:
  *                 type: string
  *                 format: email
- *                 example: arjun.mehta@example.com
+ *                 example: amit.gupta@gmail.com
  *               password:
  *                 type: string
- *                 example: SecurePass@123
+ *                 example: Password@123
  *     responses:
  *       200:
  *         description: Login successful — returns accessToken
