@@ -15,15 +15,13 @@ const { ROLES } = require('../../config/roles');
  * @swagger
  * /disputes:
  *   get:
- *     summary: GET /disputes
- *     tags: [disputes]
+ *     summary: Get all disputes for the authenticated user
+ *     tags: [Disputes]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Disputes returned successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
@@ -41,17 +39,24 @@ router.get(
  * @swagger
  * /disputes/{disputeId}:
  *   get:
- *     summary: GET /disputes/{disputeId}
- *     tags: [disputes]
+ *     summary: Get a single dispute by ID
+ *     tags: [Disputes]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: disputeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Dispute returned successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
  */
 // GET /api/v1/disputes/:disputeId
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,13 +74,30 @@ router.get(
  * @swagger
  * /disputes:
  *   post:
- *     summary: POST /disputes
- *     tags: [disputes]
+ *     summary: Open a new dispute for a booking (CUSTOMER or PROVIDER)
+ *     tags: [Disputes]
  *     security:
  *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [bookingId, subject, description]
+ *             properties:
+ *               bookingId:
+ *                 type: integer
+ *                 example: 1
+ *               subject:
+ *                 type: string
+ *                 example: "Provider did not show up"
+ *               description:
+ *                 type: string
+ *                 example: "The provider confirmed the booking but never arrived at the scheduled time."
  *     responses:
- *       200:
- *         description: Successful operation
+ *       201:
+ *         description: Dispute created successfully
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
@@ -97,13 +119,31 @@ router.post(
  * @swagger
  * /disputes/{disputeId}/messages:
  *   post:
- *     summary: POST /disputes/{disputeId}/messages
- *     tags: [disputes]
+ *     summary: Add a message to an existing dispute
+ *     tags: [Disputes]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: disputeId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [message]
+ *             properties:
+ *               message:
+ *                 type: string
+ *                 example: "I have attached the proof of service below."
  *     responses:
- *       200:
- *         description: Successful operation
+ *       201:
+ *         description: Message added successfully
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:

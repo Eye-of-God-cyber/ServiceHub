@@ -16,13 +16,37 @@ const { ROLES } = require('../../config/roles');
  * @swagger
  * /bookings:
  *   post:
- *     summary: POST /bookings
- *     tags: [bookings]
+ *     summary: Create a new booking (CUSTOMER only)
+ *     tags: [Bookings]
  *     security:
  *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [providerServiceId, addressId, scheduledAt]
+ *             properties:
+ *               providerServiceId:
+ *                 type: integer
+ *                 example: 1
+ *               addressId:
+ *                 type: integer
+ *                 example: 1
+ *               scheduledAt:
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2025-12-30T10:00:00.000Z"
+ *               notes:
+ *                 type: string
+ *                 example: "Please bring extra tools"
+ *               couponId:
+ *                 type: integer
+ *                 example: null
  *     responses:
- *       200:
- *         description: Successful operation
+ *       201:
+ *         description: Booking created successfully
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
@@ -44,15 +68,20 @@ router.post(
  * @swagger
  * /bookings:
  *   get:
- *     summary: GET /bookings
- *     tags: [bookings]
+ *     summary: Get all bookings for the authenticated user
+ *     tags: [Bookings]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [PENDING, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW]
+ *         description: Filter bookings by status
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Bookings returned successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
@@ -72,17 +101,24 @@ router.get(
  * @swagger
  * /bookings/{bookingId}:
  *   get:
- *     summary: GET /bookings/{bookingId}
- *     tags: [bookings]
+ *     summary: Get a single booking by ID
+ *     tags: [Bookings]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Booking returned successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
  */
 // GET /api/v1/bookings/:bookingId
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,13 +136,35 @@ router.get(
  * @swagger
  * /bookings/{bookingId}/status:
  *   patch:
- *     summary: PATCH /bookings/{bookingId}/status
- *     tags: [bookings]
+ *     summary: Update the status of a booking
+ *     tags: [Bookings]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [PENDING, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW]
+ *                 example: CONFIRMED
+ *               cancellationReason:
+ *                 type: string
+ *                 example: "Customer not available"
  *     responses:
  *       200:
- *         description: Successful operation
+ *         description: Booking status updated successfully
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:

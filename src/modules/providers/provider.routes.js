@@ -23,24 +23,24 @@ const { StatusCodes } = require('http-status-codes');
  * @swagger
  * /providers/me:
  *   get:
- *     summary: GET /providers/me
- *     tags: [providers]
+ *     summary: Get the authenticated provider's profile
+ *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Provider profile returned successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
  */
 // GET /api/v1/providers/me
 // ─────────────────────────────────────────────────────────────────────────────
 router.get(
   '/me',
   authenticate,
-  authorize(ROLES.PROVIDER),   // ADMIN and CUSTOMER receive 403
+  authorize(ROLES.PROVIDER),
   providerController.getProviderProfile
 );
 
@@ -49,13 +49,38 @@ router.get(
  * @swagger
  * /providers/me:
  *   put:
- *     summary: PUT /providers/me
- *     tags: [providers]
+ *     summary: Update the authenticated provider's profile
+ *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bio:
+ *                 type: string
+ *                 example: "Experienced plumber with 8 years of expertise."
+ *               experienceYears:
+ *                 type: integer
+ *                 example: 8
+ *               isAvailable:
+ *                 type: boolean
+ *                 example: true
+ *               avatarUrl:
+ *                 type: string
+ *                 example: "https://example.com/avatar.png"
+ *               firstName:
+ *                 type: string
+ *                 example: Ravi
+ *               lastName:
+ *                 type: string
+ *                 example: Kumar
  *     responses:
  *       200:
- *         description: Successful operation
+ *         description: Provider profile updated successfully
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
@@ -66,21 +91,19 @@ router.get(
 router.put('/me', authenticate, authorize(ROLES.PROVIDER), updateProviderProfileValidation, validate, providerController.updateProviderProfile);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Provider Documents (5B)
+// Provider Documents
 // ─────────────────────────────────────────────────────────────────────────────
 /**
  * @swagger
  * /providers/documents:
  *   get:
- *     summary: GET /providers/documents
+ *     summary: Get all documents submitted by the authenticated provider
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Documents returned successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
@@ -88,14 +111,30 @@ router.get('/documents', authenticate, authorize(ROLES.PROVIDER), async (req, re
   const docs = await docService.getDocuments(req.user.id);
   res.json(new ApiResponse(StatusCodes.OK, docs, 'Documents fetched successfully'));
 });
+
 /**
  * @swagger
  * /providers/documents:
  *   post:
- *     summary: POST /providers/documents
+ *     summary: Submit a new verification document
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [documentType, documentUrl]
+ *             properties:
+ *               documentType:
+ *                 type: string
+ *                 enum: [ID_PROOF, ADDRESS_PROOF, CERTIFICATION, POLICE_CLEARANCE, BUSINESS_LICENSE]
+ *                 example: ID_PROOF
+ *               documentUrl:
+ *                 type: string
+ *                 example: "https://example.com/docs/id.pdf"
  *     responses:
  *       201:
  *         description: Document submitted successfully
@@ -108,11 +147,12 @@ router.post('/documents', authenticate, authorize(ROLES.PROVIDER), createDocumen
   const doc = await docService.createDocument(req.user.id, req.body);
   res.status(StatusCodes.CREATED).json(new ApiResponse(StatusCodes.CREATED, doc, 'Document submitted successfully'));
 });
+
 /**
  * @swagger
  * /providers/documents/{docId}:
  *   delete:
- *     summary: DELETE /providers/documents/{docId}
+ *     summary: Delete a provider document
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -122,13 +162,14 @@ router.post('/documents', authenticate, authorize(ROLES.PROVIDER), createDocumen
  *         required: true
  *         schema:
  *           type: integer
+ *         example: 1
  *     responses:
  *       200:
  *         description: Document deleted successfully
- *       400:
- *         $ref: '#/components/responses/ValidationError'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
  */
 router.delete('/documents/:docId', authenticate, authorize(ROLES.PROVIDER), docIdParam, validate, async (req, res) => {
   await docService.deleteDocument(req.user.id, req.params.docId);
@@ -136,36 +177,67 @@ router.delete('/documents/:docId', authenticate, authorize(ROLES.PROVIDER), docI
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Provider Availability (5C)
+// Provider Availability
 // ─────────────────────────────────────────────────────────────────────────────
 /**
  * @swagger
  * /providers/availability:
  *   get:
- *     summary: GET /providers/availability
+ *     summary: Get the authenticated provider's weekly availability
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Availability returned successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.get('/availability', authenticate, authorize(ROLES.PROVIDER), availabilityController.getAvailability);
+
 /**
  * @swagger
  * /providers/availability:
  *   put:
- *     summary: PUT /providers/availability
+ *     summary: Replace the provider's weekly availability schedule
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: array
+ *             items:
+ *               type: object
+ *               required: [dayOfWeek, startTime, endTime]
+ *               properties:
+ *                 dayOfWeek:
+ *                   type: string
+ *                   enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]
+ *                   example: MONDAY
+ *                 startTime:
+ *                   type: string
+ *                   example: "09:00"
+ *                 endTime:
+ *                   type: string
+ *                   example: "18:00"
+ *                 isAvailable:
+ *                   type: boolean
+ *                   example: true
+ *           example:
+ *             - dayOfWeek: MONDAY
+ *               startTime: "09:00"
+ *               endTime: "18:00"
+ *               isAvailable: true
+ *             - dayOfWeek: TUESDAY
+ *               startTime: "09:00"
+ *               endTime: "18:00"
+ *               isAvailable: true
  *     responses:
  *       200:
- *         description: Successful operation
+ *         description: Availability updated successfully
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
@@ -174,47 +246,66 @@ router.get('/availability', authenticate, authorize(ROLES.PROVIDER), availabilit
 router.put('/availability', authenticate, authorize(ROLES.PROVIDER), updateAvailabilityValidation, validate, availabilityController.updateAvailability);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Provider Time Off (5C)
+// Provider Time Off
 // ─────────────────────────────────────────────────────────────────────────────
 /**
  * @swagger
  * /providers/time-off:
  *   get:
- *     summary: GET /providers/time-off
+ *     summary: Get all time-off entries for the authenticated provider
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Time-off list returned successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.get('/time-off', authenticate, authorize(ROLES.PROVIDER), availabilityController.getTimeOffs);
+
 /**
  * @swagger
  * /providers/time-off:
  *   post:
- *     summary: POST /providers/time-off
+ *     summary: Create a time-off block for the provider
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [startDate, endDate]
+ *             properties:
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 example: "2025-12-24"
+ *               endDate:
+ *                 type: string
+ *                 format: date
+ *                 example: "2025-12-26"
+ *               reason:
+ *                 type: string
+ *                 example: "Christmas holiday"
  *     responses:
  *       201:
- *         description: Successful operation
+ *         description: Time-off created successfully
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.post('/time-off', authenticate, authorize(ROLES.PROVIDER), createTimeOffValidation, validate, availabilityController.createTimeOff);
+
 /**
  * @swagger
  * /providers/time-off/{timeOffId}:
  *   delete:
- *     summary: DELETE /providers/time-off/{timeOffId}
+ *     summary: Delete a time-off entry
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -224,58 +315,79 @@ router.post('/time-off', authenticate, authorize(ROLES.PROVIDER), createTimeOffV
  *         required: true
  *         schema:
  *           type: integer
+ *         example: 1
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Time-off deleted successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
  */
 router.delete('/time-off/:timeOffId', authenticate, authorize(ROLES.PROVIDER), timeOffIdParam, validate, availabilityController.deleteTimeOff);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Provider Services (5D)
+// Provider Services
 // ─────────────────────────────────────────────────────────────────────────────
 /**
  * @swagger
  * /providers/services:
  *   get:
- *     summary: GET /providers/services
+ *     summary: Get all services offered by the authenticated provider
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Provider services returned successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.get('/services', authenticate, authorize(ROLES.PROVIDER), psController.getProviderServices);
+
 /**
  * @swagger
  * /providers/services:
  *   post:
- *     summary: POST /providers/services
+ *     summary: Add a catalog service to the provider's offered services
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [serviceId]
+ *             properties:
+ *               serviceId:
+ *                 type: integer
+ *                 example: 1
+ *               customPrice:
+ *                 type: number
+ *                 example: 499.00
+ *               isAvailable:
+ *                 type: boolean
+ *                 example: true
+ *               description:
+ *                 type: string
+ *                 example: "Professional pipe fitting and leak repair"
  *     responses:
  *       201:
- *         description: Successful operation
+ *         description: Provider service created successfully
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.post('/services', authenticate, authorize(ROLES.PROVIDER), createProviderServiceValidation, validate, psController.createProviderService);
+
 /**
  * @swagger
  * /providers/services/{providerServiceId}:
  *   put:
- *     summary: PUT /providers/services/{providerServiceId}
+ *     summary: Update a provider's offered service
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -285,20 +397,38 @@ router.post('/services', authenticate, authorize(ROLES.PROVIDER), createProvider
  *         required: true
  *         schema:
  *           type: integer
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               customPrice:
+ *                 type: number
+ *                 example: 599.00
+ *               isAvailable:
+ *                 type: boolean
+ *                 example: false
+ *               description:
+ *                 type: string
+ *                 example: "Updated service description"
  *     responses:
  *       200:
- *         description: Successful operation
+ *         description: Provider service updated successfully
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 router.put('/services/:providerServiceId', authenticate, authorize(ROLES.PROVIDER), pSvcIdParam, updateProviderServiceValidation, validate, psController.updateProviderService);
+
 /**
  * @swagger
  * /providers/services/{providerServiceId}:
  *   delete:
- *     summary: DELETE /providers/services/{providerServiceId}
+ *     summary: Remove a service from the provider's offerings
  *     tags: [Providers]
  *     security:
  *       - BearerAuth: []
@@ -308,13 +438,14 @@ router.put('/services/:providerServiceId', authenticate, authorize(ROLES.PROVIDE
  *         required: true
  *         schema:
  *           type: integer
+ *         example: 1
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Provider service removed successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
  */
 router.delete('/services/:providerServiceId', authenticate, authorize(ROLES.PROVIDER), pSvcIdParam, validate, psController.deleteProviderService);
 

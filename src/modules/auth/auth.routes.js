@@ -13,16 +13,44 @@ const { registerValidation, loginValidation } = require('../../validations/auth.
  * @swagger
  * /auth/register:
  *   post:
- *     summary: POST /auth/register
- *     tags: [auth]
+ *     summary: Register a new user (Customer or Provider)
+ *     tags: [Auth]
  *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [firstName, lastName, email, phone, password, role]
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 example: Arjun
+ *               lastName:
+ *                 type: string
+ *                 example: Mehta
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: arjun.mehta@example.com
+ *               phone:
+ *                 type: string
+ *                 example: "9876543210"
+ *               password:
+ *                 type: string
+ *                 example: SecurePass@123
+ *               role:
+ *                 type: string
+ *                 enum: [CUSTOMER, PROVIDER]
+ *                 example: CUSTOMER
  *     responses:
- *       200:
- *         description: Successful operation
+ *       201:
+ *         description: User registered successfully
  *       400:
  *         $ref: '#/components/responses/ValidationError'
- *       401:
- *         $ref: '#/components/responses/UnauthorizedError'
+ *       409:
+ *         description: Email or phone already registered
  */
 // POST /api/v1/auth/register
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,12 +61,27 @@ router.post('/register', registerValidation, validate, authController.register);
  * @swagger
  * /auth/login:
  *   post:
- *     summary: POST /auth/login
- *     tags: [auth]
+ *     summary: Login with email and password
+ *     tags: [Auth]
  *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: arjun.mehta@example.com
+ *               password:
+ *                 type: string
+ *                 example: SecurePass@123
  *     responses:
  *       200:
- *         description: Successful operation
+ *         description: Login successful — returns accessToken
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
@@ -53,15 +96,13 @@ router.post('/login', loginValidation, validate, authController.login);
  * @swagger
  * /auth/me:
  *   get:
- *     summary: GET /auth/me
- *     tags: [auth]
+ *     summary: Get the currently authenticated user's full profile
+ *     tags: [Auth]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: Successful operation
- *       400:
- *         $ref: '#/components/responses/ValidationError'
+ *         description: Authenticated user profile
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
