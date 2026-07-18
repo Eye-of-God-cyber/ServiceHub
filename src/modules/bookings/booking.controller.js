@@ -10,19 +10,22 @@ const createBooking = async (req, res) => {
 };
 
 const getBookings = async (req, res) => {
-  const result = await bookingService.getBookings(req.user.id, req.user.userRoles, req.query);
+  const roleNames = req.user.userRoles.map(ur => ur.role.name);
+  const result = await bookingService.getBookings(req.user.id, roleNames, req.query);
   const response = new ApiResponse(StatusCodes.OK, result.data, 'Bookings fetched successfully');
   response.meta = result.meta;
   res.json(response);
 };
 
 const getBookingById = async (req, res) => {
-  const data = await bookingService.getBookingById(req.user.id, req.user.userRoles, req.params.bookingId);
+  const roleNames = req.user.userRoles.map(ur => ur.role.name);
+  const data = await bookingService.getBookingById(req.user.id, roleNames, req.params.bookingId);
   res.json(new ApiResponse(StatusCodes.OK, data, 'Booking details fetched successfully'));
 };
 
 const updateBookingStatus = async (req, res) => {
-  const data = await bookingService.updateBookingStatus(req.user.id, req.user.userRoles, req.params.bookingId, req.body);
+  const roleNames = req.user.userRoles.map(ur => ur.role.name);
+  const data = await bookingService.updateBookingStatus(req.user.id, roleNames, req.params.bookingId, req.body);
   res.json(new ApiResponse(StatusCodes.OK, data, 'Booking status updated successfully'));
 };
 
