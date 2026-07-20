@@ -2,9 +2,11 @@
 node_modules/
 
 # ─── Environment Secrets ──────────────────────────────
+# All .env variants are secrets — only .env.example files are committed
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
+!.env.*.example
 
 # ─── Logs ─────────────────────────────────────────────
 logs/
@@ -17,6 +19,10 @@ uploads/
 # ─── Build / Compiled ─────────────────────────────────
 dist/
 build/
+.next/
+
+# ─── Test Coverage ────────────────────────────────────
+coverage/
 
 # ─── OS & Editor Artifacts ────────────────────────────
 .DS_Store
@@ -25,8 +31,23 @@ Thumbs.db
 
 # ─── Prisma Generated Client ──────────────────────────
 # The generated client is always re-created via `prisma generate`
-# so there is no need to commit it.
 # node_modules/@prisma/client is excluded above via node_modules/
+
+# ─── Development Debug Scripts ────────────────────────
+# These are one-off scripts created during development.
+# They are excluded from the Docker image via .dockerignore
+# and excluded from the public repository here.
+check.js
+check2.js
+test-db.js
+generate_token.js
+
+# ─── Temporary / Generated Outputs ───────────────────
+lint_output.txt
+swagger.json
+
+# ─── Windows-only Dev Automation ─────────────────────
+run_all.ps1
 
 # ─── Misc ─────────────────────────────────────────────
 *.swp
