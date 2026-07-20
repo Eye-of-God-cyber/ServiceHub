@@ -26,11 +26,11 @@ uploads
 check.js
 check2.js
 test-db.js
-run_benchmarks.js
 generate_token.js
 lint_output.txt
 run_all.ps1
 *.ps1
+scripts/
 
 # ─── Dev Config ─────────────────────────────────────────────────
 nodemon.json
