@@ -18,7 +18,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // binaryTargets is mandatory for deterministic Docker builds.
+  // "native"                → covers local development (Windows, macOS, Linux)
+  // "debian-openssl-3.0.x" → the node:18-slim (Debian Bookworm) production target
+  // Without this, prisma generate picks the engine based on the builder container's
+  // detected OpenSSL version, which is non-deterministic when node:18-slim
+  // floats between Debian Bullseye (OpenSSL 1.1) and Bookworm (OpenSSL 3.x).
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {

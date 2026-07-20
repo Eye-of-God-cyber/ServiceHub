@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:18-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ RUN npx prisma generate
 # ==========================================
 # Production Stage
 # ==========================================
-FROM node:18-alpine AS production
+FROM node:18-bookworm-slim AS production
 
 # Set NODE_ENV to production
 ENV NODE_ENV=production
@@ -36,14 +36,21 @@ COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/clie
 # Copy application source code
 COPY . .
 
+# Install OpenSSL — required by Prisma's debian-openssl-3.0.x query engine binary.
+# node:18-bookworm-slim does not include libssl3 by default; this provides libssl.so.3.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set a non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
+# node:18-bookworm-slim (Debian 12) — uses standard groupadd/useradd
+RUN groupadd -g 1001 nodejs && \
+    useradd -u 1001 -g nodejs -s /bin/bash -m nodejs && \
     chown -R nodejs:nodejs /app
 
 USER nodejs
 
-# Expose port (default 3000 but configurable)
+# Expose port (default 3000 — consistent with env.js and docker-compose.yml)
 EXPOSE 3000
 
 # Start the application
