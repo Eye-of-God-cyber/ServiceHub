@@ -5,8 +5,8 @@ const ApiResponse = require('../../utils/ApiResponse');
 const { StatusCodes } = require('http-status-codes');
 
 const getNotifications = async (req, res) => {
-  const data = await notificationService.getNotifications(req.user.id, req.query);
-  res.json(new ApiResponse(StatusCodes.OK, data, 'Notifications fetched successfully'));
+  const result = await notificationService.getNotifications(req.user.id, req.query);
+  return ApiResponse.success(res, { message: 'Notifications fetched successfully', data: result.data, meta: result.meta });
 };
 
 const markAsRead = async (req, res) => {

@@ -24,6 +24,7 @@ const swaggerUi = require('swagger-ui-express');
 
 const config = require('./config/env');
 const swaggerSpec = require('./config/swagger');
+const requestId = require('./middleware/requestId');
 const requestLogger = require('./middleware/requestLogger');
 const { globalLimiter } = require('./middleware/rateLimiter');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -84,7 +85,15 @@ app.use(cookieParser());                        // Parse Cookie header for refre
 app.use(hpp());
 
 // ─────────────────────────────────────────────────────────
-// 5. Request Logging
+// 5. Request Correlation ID
+//    Generates or echoes X-Request-ID on every request.
+//    Registered before requestLogger so the ID is available
+//    when Morgan formats the log line.
+// ─────────────────────────────────────────────────────────
+app.use(requestId);
+
+// ─────────────────────────────────────────────────────────
+// 6. Request Logging
 // ─────────────────────────────────────────────────────────
 app.use(requestLogger);
 

@@ -7,6 +7,7 @@ const authController = require('./auth.controller');
 const validate = require('../../middleware/validate');
 const authenticate = require('../../middleware/auth.middleware');
 const { registerValidation, loginValidation } = require('../../validations/auth.validation');
+const { authLimiter } = require('../../middleware/rateLimiter');
 
 // ─────────────────────────────────────────────────────────────────────────────
 /**
@@ -54,7 +55,7 @@ const { registerValidation, loginValidation } = require('../../validations/auth.
  */
 // POST /api/v1/auth/register
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/register', registerValidation, validate, authController.register);
+router.post('/register', authLimiter, registerValidation, validate, authController.register);
 
 // ─────────────────────────────────────────────────────────────────────────────
 /**
@@ -89,7 +90,7 @@ router.post('/register', registerValidation, validate, authController.register);
  */
 // POST /api/v1/auth/login
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/login', loginValidation, validate, authController.login);
+router.post('/login', authLimiter, loginValidation, validate, authController.login);
 
 // ─────────────────────────────────────────────────────────────────────────────
 /**

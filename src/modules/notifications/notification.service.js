@@ -1,10 +1,9 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 const AppError = require('../../utils/AppError');
 const { StatusCodes } = require('http-status-codes');
-
-const prisma = new PrismaClient();
+const { getPaginationOptions, formatPaginatedResponse } = require('../../utils/pagination.util');
 
 const getNotifications = async (userId, filters = {}) => {
   const where = { userId };
@@ -12,11 +11,19 @@ const getNotifications = async (userId, filters = {}) => {
     where.isRead = false;
   }
 
-  return prisma.notification.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    take: 50, // Limit to 50 most recent for performance
-  });
+  const { page, limit, skip, take } = getPaginationOptions(filters);
+
+  const [data, total] = await Promise.all([
+    prisma.notification.findMany({
+      where,
+      orderBy: { id: 'desc' },
+      skip,
+      take,
+    }),
+    prisma.notification.count({ where }),
+  ]);
+
+  return formatPaginatedResponse(data, total, page, limit);
 };
 
 const markAsRead = async (userId, notificationId) => {

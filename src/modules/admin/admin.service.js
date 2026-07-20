@@ -1,10 +1,8 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 const AppError = require('../../utils/AppError');
 const { StatusCodes } = require('http-status-codes');
-
-const prisma = new PrismaClient();
 
 const updateDocumentStatus = async (docId, status, adminNotes) => {
   const doc = await prisma.providerDocument.findUnique({ where: { id: docId } });
@@ -13,7 +11,7 @@ const updateDocumentStatus = async (docId, status, adminNotes) => {
   return prisma.$transaction(async (tx) => {
     const updatedDoc = await tx.providerDocument.update({
       where: { id: docId },
-      data: { status, adminNotes },
+      data: { status, adminNotes, reviewedAt: new Date() },
     });
 
     // Check if provider has all docs approved. If so, auto-verify profile.

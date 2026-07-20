@@ -1,10 +1,9 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 const AppError = require('../../utils/AppError');
 const { StatusCodes } = require('http-status-codes');
 
-const prisma = new PrismaClient();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared select — keeps DTO shape consistent across all operations

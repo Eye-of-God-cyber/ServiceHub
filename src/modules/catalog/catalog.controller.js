@@ -10,8 +10,9 @@ const getCategories = async (req, res) => {
 };
 
 const getServices = async (req, res) => {
-  const data = await catalogService.getServices(req.query.categoryId);
-  res.json(new ApiResponse(StatusCodes.OK, data, 'Services fetched successfully'));
+  const { categoryId, ...filters } = req.query;
+  const result = await catalogService.getServices(categoryId, filters);
+  return ApiResponse.success(res, { message: 'Services fetched successfully', data: result.data, meta: result.meta });
 };
 
 const getServiceById = async (req, res) => {

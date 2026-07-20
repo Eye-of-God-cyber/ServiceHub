@@ -1,11 +1,11 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 const AppError = require('../../utils/AppError');
 const { StatusCodes } = require('http-status-codes');
 const { Decimal } = require('@prisma/client/runtime/library');
+const { getPaginationOptions, formatPaginatedResponse } = require('../../utils/pagination.util');
 
-const prisma = new PrismaClient();
 
 /**
  * Ensures a user has a wallet. If not, creates one (idempotent).
@@ -19,17 +19,24 @@ const assertWallet = async (userId) => {
   return wallet;
 };
 
-const getMyWallet = async (userId, limit = 20) => {
+const getMyWallet = async (userId, filters = {}) => {
   const wallet = await assertWallet(userId);
-  const transactions = await prisma.walletTransaction.findMany({
-    where: { walletId: wallet.id },
-    orderBy: { createdAt: 'desc' },
-    take: limit,
-  });
+
+  const { page, limit, skip, take } = getPaginationOptions(filters);
+
+  const [transactions, total] = await Promise.all([
+    prisma.walletTransaction.findMany({
+      where: { walletId: wallet.id },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+    }),
+    prisma.walletTransaction.count({ where: { walletId: wallet.id } }),
+  ]);
 
   return {
     balance: wallet.balance,
-    transactions,
+    transactions: formatPaginatedResponse(transactions, total, page, limit),
   };
 };
 

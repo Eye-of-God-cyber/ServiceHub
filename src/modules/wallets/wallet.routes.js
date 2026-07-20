@@ -5,6 +5,8 @@ const router  = express.Router();
 
 const walletController = require('./wallet.controller');
 const authenticate     = require('../../middleware/auth.middleware');
+const validate         = require('../../middleware/validate');
+const { getWalletValidation } = require('../../validations/wallet.validation');
 
 // ─────────────────────────────────────────────────────────────────────────────
 /**
@@ -27,6 +29,8 @@ const authenticate     = require('../../middleware/auth.middleware');
 router.get(
   '/me',
   authenticate,
+  getWalletValidation,
+  validate,
   walletController.getMyWallet
 );
 

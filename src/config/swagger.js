@@ -94,7 +94,21 @@ const swaggerDefinition = {
     ];
   })(),
   // ─── Reusable security scheme ─────────────────────────
-  components: {
+    components: {
+    parameters: {
+      PaginationPage: {
+        in: 'query',
+        name: 'page',
+        schema: { type: 'integer', default: 1, minimum: 1 },
+        description: 'Page number for pagination'
+      },
+      PaginationLimit: {
+        in: 'query',
+        name: 'limit',
+        schema: { type: 'integer', default: 20, minimum: 1, maximum: 100 },
+        description: 'Number of items per page'
+      }
+    },
     securitySchemes: {
       BearerAuth: {
         type: 'http',

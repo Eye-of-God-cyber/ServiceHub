@@ -2,10 +2,8 @@
 
 const { verifyAccessToken } = require('../utils/jwt.util');
 const { UnauthorizedError, InvalidTokenError } = require('../errors/auth.error');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../config/prisma');
 const { HEADER_NAME, BEARER_PREFIX } = require('../config/auth.constants');
-
-const prisma = new PrismaClient();
 
 /**
  * Authentication Middleware

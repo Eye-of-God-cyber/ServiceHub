@@ -20,6 +20,7 @@ const globalForPrisma = global;
 const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
+    log: ['query', 'info', 'warn', 'error'],
     // Log every query in development so we can catch N+1 problems early.
     // In production, only log warnings and errors.
     log: config.isDevelopment

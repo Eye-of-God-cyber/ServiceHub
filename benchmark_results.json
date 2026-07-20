@@ -1,0 +1,60 @@
+{
+  "catalog_services": {
+    "10": {
+      "requestsPerSec": 47.67,
+      "throughputMb": "0.45",
+      "latencyAvg": 209.69,
+      "latencyP99": 588,
+      "latencyMax": 1803,
+      "errors": 0,
+      "non2xx": 0
+    },
+    "25": {
+      "requestsPerSec": 61.37,
+      "throughputMb": "0.58",
+      "latencyAvg": 406.01,
+      "latencyP99": 668,
+      "latencyMax": 899,
+      "errors": 0,
+      "non2xx": 0
+    },
+    "50": {
+      "requestsPerSec": 59.94,
+      "throughputMb": "0.57",
+      "latencyAvg": 827.18,
+      "latencyP99": 1180,
+      "latencyMax": 1414,
+      "errors": 0,
+      "non2xx": 0
+    }
+  },
+  "notifications": {
+    "10": {
+      "requestsPerSec": 29.04,
+      "throughputMb": "0.04",
+      "latencyAvg": 343.35,
+      "latencyP99": 1233,
+      "latencyMax": 1484,
+      "errors": 0,
+      "non2xx": 0
+    },
+    "25": {
+      "requestsPerSec": 44.14,
+      "throughputMb": "0.06",
+      "latencyAvg": 564.02,
+      "latencyP99": 862,
+      "latencyMax": 1096,
+      "errors": 0,
+      "non2xx": 0
+    },
+    "50": {
+      "requestsPerSec": 43.67,
+      "throughputMb": "0.06",
+      "latencyAvg": 1132.86,
+      "latencyP99": 1517,
+      "latencyMax": 1685,
+      "errors": 0,
+      "non2xx": 0
+    }
+  }
+}

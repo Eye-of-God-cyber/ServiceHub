@@ -1,16 +1,11 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 const AppError = require('../../utils/AppError');
 const { StatusCodes } = require('http-status-codes');
 const { getPaginationOptions, formatPaginatedResponse } = require('../../utils/pagination.util');
+const { getProviderIdOrNull } = require('../../utils/provider.util');
 
-const prisma = new PrismaClient();
-
-const getProviderId = async (userId) => {
-  const pp = await prisma.providerProfile.findUnique({ where: { userId }, select: { id: true } });
-  return pp ? pp.id : null;
-};
 
 // Common include for disputes
 const DISPUTE_INCLUDE = {
@@ -39,7 +34,7 @@ const assertDisputeAccess = async (userId, userRoles, disputeId) => {
     isOwner = true;
   }
   if (!isOwner && userRoles.includes('PROVIDER')) {
-    const providerId = await getProviderId(userId);
+    const providerId = await getProviderIdOrNull(userId);
     if (providerId && dispute.booking.providerId === providerId) {
       isOwner = true;
     }
@@ -68,7 +63,7 @@ const getDisputes = async (userId, userRoles, filters = {}) => {
   }
 
   if (userRoles.includes('PROVIDER')) {
-    const providerId = await getProviderId(userId);
+    const providerId = await getProviderIdOrNull(userId);
     if (providerId) {
       orConditions.push({ booking: { providerId } });
     }
@@ -106,7 +101,7 @@ const createDispute = async (userId, userRoles, payload) => {
   let isParticipant = false;
   if (userRoles.includes('CUSTOMER') && booking.customerId === userId) {isParticipant = true;}
   if (!isParticipant && userRoles.includes('PROVIDER')) {
-    const providerId = await getProviderId(userId);
+    const providerId = await getProviderIdOrNull(userId);
     if (providerId && booking.providerId === providerId) {isParticipant = true;}
   }
 

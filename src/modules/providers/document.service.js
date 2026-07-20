@@ -1,22 +1,14 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 const AppError = require('../../utils/AppError');
 const { StatusCodes } = require('http-status-codes');
-
-const prisma = new PrismaClient();
+const { getProviderId } = require('../../utils/provider.util');
 
 const DOC_SELECT = {
   id: true, documentType: true, documentUrl: true,
   status: true, adminNotes: true, reviewedAt: true,
   createdAt: true, updatedAt: true,
-};
-
-// Resolve providerId from userId
-const getProviderId = async (userId) => {
-  const pp = await prisma.providerProfile.findUnique({ where: { userId }, select: { id: true } });
-  if (!pp) {throw new AppError('Provider profile not found.', StatusCodes.NOT_FOUND);}
-  return pp.id;
 };
 
 // Assert ownership: document must belong to this provider

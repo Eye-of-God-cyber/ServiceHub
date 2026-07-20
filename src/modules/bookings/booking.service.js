@@ -1,17 +1,12 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 const AppError = require('../../utils/AppError');
 const { StatusCodes } = require('http-status-codes');
 const { Decimal } = require('@prisma/client/runtime/library');
 const { getPaginationOptions, formatPaginatedResponse } = require('../../utils/pagination.util');
+const { getProviderIdOrNull } = require('../../utils/provider.util');
 
-const prisma = new PrismaClient();
-
-const getProviderId = async (userId) => {
-  const pp = await prisma.providerProfile.findUnique({ where: { userId }, select: { id: true } });
-  return pp ? pp.id : null;
-};
 
 // Common include for detailed booking views
 const BOOKING_INCLUDE = {
@@ -35,7 +30,7 @@ const getBookings = async (userId, userRoles, filters = {}) => {
   }
 
   if (userRoles.includes('PROVIDER')) {
-    const providerId = await getProviderId(userId);
+    const providerId = await getProviderIdOrNull(userId);
     if (providerId) {
       orConditions.push({ providerId });
     }
@@ -83,7 +78,7 @@ const getBookingById = async (userId, userRoles, bookingId) => {
     isOwner = true;
   }
   if (!isOwner && userRoles.includes('PROVIDER')) {
-    const providerId = await getProviderId(userId);
+    const providerId = await getProviderIdOrNull(userId);
     if (providerId && booking.providerId === providerId) {
       isOwner = true;
     }
@@ -205,7 +200,7 @@ const updateBookingStatus = async (userId, userRoles, bookingId, payload) => {
   if (userRoles.includes('CUSTOMER') && booking.customerId === userId) {isCustomer = true;}
   
   if (userRoles.includes('PROVIDER') && !isCustomer) {
-    const providerId = await getProviderId(userId);
+    const providerId = await getProviderIdOrNull(userId);
     if (providerId && booking.providerId === providerId) {isProvider = true;}
   }
 

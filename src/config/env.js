@@ -31,7 +31,7 @@ const config = {
   isTest: NODE_ENV === 'test',
 
   server: {
-    port: parseInt(process.env.PORT, 10) || 5000,
+    port: parseInt(process.env.PORT, 10) || 3000,
   },
 
   database: {

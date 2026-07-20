@@ -1,12 +1,10 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 const { hashPassword, comparePassword } = require('../../utils/password.util');
 const { generateAccessToken } = require('../../utils/jwt.util');
 const AppError = require('../../utils/AppError');
 const { StatusCodes } = require('http-status-codes');
-
-const prisma = new PrismaClient();
 
 /**
  * Register a new User (Customer or Provider).

@@ -49,7 +49,7 @@ https://servicehub-api-13vx.onrender.com/api-docs.json
 14. [Running the Server](#14-running-the-server)
 15. [Deployment](#15-deployment)
 16. [API Usage Examples](#16-api-usage-examples)
-17. [Performance Considerations](#17-performance-considerations)
+17. [Performance Benchmarks & Considerations](#17-performance-benchmarks--considerations)
 18. [Known Limitations](#18-known-limitations)
 19. [Future Improvements](#19-future-improvements)
 20. [Contributing](#20-contributing)
@@ -1094,7 +1094,51 @@ curl -X PATCH https://servicehub-api-13vx.onrender.com/api/v1/admin/documents/3/
 
 ---
 
-## 17. Performance Considerations
+## 17. Testing
+
+ServiceHub features a production-grade integration test suite built with **Jest** and **Supertest** to validate end-to-end API correctness, transactional safety, and database concurrency.
+
+### Testing Architecture
+- **Dedicated Test Schema:** Tests execute exclusively against a highly isolated `test_schema` on the Neon PostgreSQL database. This fully isolates test state from development and production data (`public` schema), preventing accidental deletion of real user data.
+- **Safety Guards:** Destructive database operations (e.g., table truncation) are hard-blocked unless both `NODE_ENV === 'test'` and the `DATABASE_URL` connection string explicitly point to `schema=test_schema`.
+- **Atomic State Reset:** Before every test runs, the `test_schema` is cleanly wiped using an atomic `TRUNCATE TABLE ... RESTART IDENTITY CASCADE` operation. This avoids unpredictable state leakage without dropping and recreating the schema, dramatically speeding up the testing lifecycle.
+- **Singleton PrismaClient:** The test suite correctly imports the application's shared `PrismaClient` singleton instead of instantiating new instances. This mirrors the production environment, prevents connection pool exhaustion, and ensures Prisma middleware (like logging or soft deletes) executes accurately.
+
+### Running Tests
+
+```bash
+# Ensure your testing database URL is set
+export DATABASE_URL="postgresql://user:password@host/db?schema=test_schema"
+export NODE_ENV="test"
+
+# Run the full integration suite sequentially
+npm run test
+```
+
+*Note: The test suite must be run with `--runInBand` (sequentially) to prevent race conditions during the global `beforeEach` database truncation phase.*
+
+---
+
+## 18. Performance Benchmarks & Considerations
+
+### Load Testing Results
+
+The API has been rigorously load-tested using the `autocannon` benchmarking tool to validate production engineering decisions. The load tests hit a deployed Node.js Express server connected over the network to a managed PostgreSQL database (Neon Free Tier).
+
+**Hardware/Network Constraints:**
+- The performance numbers below reflect a highly constrained environment: a single Node.js process and a free-tier database with significant network latency. 
+- A simple `SELECT 1` health check maxes out at ~216 req/sec under these network constraints, establishing the absolute ceiling for this deployment tier.
+- The results demonstrate stability and zero error rates under sustained concurrency.
+
+**Test Setup:** 50 concurrent connections over 30 seconds (1500 total connections)
+
+| Endpoint | Auth | Request Type | Avg Latency | p99 Latency | Max Latency | Throughput |
+|----------|------|--------------|-------------|-------------|-------------|------------|
+| `GET /api/v1/health` | Public | DB `SELECT 1` ping | 230ms | 302ms | 573ms | ~216 req/sec |
+| `GET /api/v1/catalog/services` | Public | Pagination + Join (`category`) + PK Sort | 827ms | 1.18s | 1.41s | ~60 req/sec |
+| `GET /api/v1/notifications` | JWT | Auth + Pagination + PK Sort | 1.13s | 1.51s | 1.68s | ~43 req/sec |
+
+*Note: 0% error rate and 0 non-2xx status codes across all tests.*
 
 ### Index Coverage
 All high-frequency access patterns have dedicated indexes — see the [Index Strategy](#index-strategy) section in Database Design. Key patterns covered:
@@ -1118,7 +1162,7 @@ Wallet and coupon operations use Prisma's atomic `increment`/`decrement` instead
 
 ---
 
-## 18. Known Limitations
+## 19. Known Limitations
 
 - **No payment gateway integration.** The `payments` table is fully schema-complete — it supports multiple attempts, stores the raw gateway JSON response, and tracks `paidAt`. However, live card/UPI processing via Razorpay, Stripe, or similar is not implemented. Wallet top-up is not exposed as a real payment flow.
 
@@ -1169,7 +1213,143 @@ PRs with lint errors will not be merged. All new API endpoints must include vali
 
 ---
 
-## 21. License
+## 21. Continuous Integration
+
+ServiceHub utilizes a robust **GitHub Actions** CI pipeline to ensure zero-regression deployments and maintain high codebase quality. The pipeline automatically triggers on every `push` and `pull_request` to the `main` branch.
+
+### Workflow Pipeline
+The pipeline runs on `ubuntu-latest` and executes the following steps synchronously:
+1. **Repository Checkout:** Pulls the latest code.
+2. **Node.js Setup:** Installs Node.js v18 and caches `npm` modules.
+3. **Database Spin-up:** Boots an isolated PostgreSQL service container (`postgres:15-alpine`) natively within the runner.
+4. **Dependency Installation:** Runs a clean `npm ci`.
+5. **Prisma Generation & Migration:** Compiles the Prisma Client and applies database migrations to the isolated CI database.
+6. **Linting Check:** Executes ESLint to verify codebase hygiene.
+7. **Integration Tests:** Runs the full Jest & Supertest integration suite (19/19 tests) against the temporary CI database schema.
+8. **Docker Validation:** Performs a `docker build` of the multi-stage Dockerfile to verify the production image builds successfully.
+
+The workflow fails immediately if any step returns a non-zero exit code.
+
+### Required GitHub Secrets
+To pass the CI tests (which require authentication keys to boot up the application), you must configure the following **Repository Secrets** in your GitHub project settings (`Settings > Secrets and variables > Actions`):
+
+- `JWT_ACCESS_SECRET` - Used to sign access tokens during integration tests.
+- `JWT_REFRESH_SECRET` - Used to sign refresh tokens during integration tests.
+
+*Note: `DATABASE_URL` is purposely excluded from GitHub Secrets in the CI environment because the pipeline spins up a self-contained ephemeral PostgreSQL service container on `localhost:5432` to maximize isolation and prevent concurrent test suites from wiping an external staging database.*
+
+### Local Verification
+You can simulate the exact CI test suite locally by running:
+```bash
+npm run lint
+npm run test # Ensure your local .env DATABASE_URL points to a test_schema!
+docker build -t servicehub-api:ci .
+```
+
+### Troubleshooting
+- **Tests Failing in CI but passing locally:** The CI uses an empty PostgreSQL container and runs migrations fresh. If it fails in CI, you may have uncommitted Prisma migrations, or you are relying on dirty data seeded in your local development database.
+- **Docker Build Fails in CI:** Ensure all newly added packages are present in `package.json` and `package-lock.json` since the workflow strictly uses `npm ci`.
+
+---
+
+## 22. Docker Deployment
+
+ServiceHub includes a production-grade Docker setup for reproducible, secure, and isolated deployments. The configuration uses a multi-stage Dockerfile that minimizes image size by excluding development dependencies and caches the Prisma query engine effectively. The application listens on **port 3000** in all environments — this is consistent across `Dockerfile`, `docker-compose.yml`, and `env.js`.
+
+### Docker Prerequisites
+- Docker Engine installed and running
+- Docker Compose (optional, for local development orchestration)
+- Environment variables configured in `.env`
+
+### Building the Docker Image
+```bash
+docker build -t servicehub-api:latest .
+```
+
+### Running the Container (Standalone)
+```bash
+docker run -d \
+  -p 3000:3000 \
+  --name servicehub-api \
+  --env-file .env \
+  servicehub-api:latest
+```
+
+### Running with Docker Compose (Recommended for Development)
+```bash
+# Starts the API container with healthcheck, mounts uploads/logs directories
+docker-compose up -d --build
+
+# Check container health status
+docker inspect --format='{{.State.Health.Status}}' servicehub-api
+```
+
+The container includes an automatic healthcheck that polls `GET /api/v1/health` every 30 seconds. Docker will automatically restart the container if it fails 3 consecutive health checks.
+
+### Troubleshooting
+- **Database Connection:** Ensure your `DATABASE_URL` in `.env` is accessible from within the container (e.g., if using a local Postgres database, you may need to use `host.docker.internal` instead of `localhost`). Since ServiceHub uses Neon PostgreSQL, the cloud URL should work seamlessly.
+- **Port Conflicts:** If port 3000 is occupied, you can change the mapping in `docker-compose.yml` or the `docker run` command (e.g., `-p 8080:3000`).
+- **Container Status:** Run `docker logs servicehub-api` to inspect startup logs and verify Prisma connected successfully.
+
+---
+
+## 23. Microsoft Azure Deployment
+
+ServiceHub is configured for zero-downtime deployment to **Azure App Service (Web App for Containers)**. This is the recommended Azure production option as it natively supports Docker containers, abstracts server maintenance, and handles HTTPS termination seamlessly.
+
+### Prerequisites
+- [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) installed (`az`)
+- A Docker Hub or Azure Container Registry (ACR) account containing your pushed `servicehub-api:latest` image
+- An active Microsoft Azure Subscription
+
+### Deployment Steps (via Azure CLI)
+
+**1. Create a Resource Group**
+```bash
+az group create --name ServiceHub-RG --location eastus
+```
+
+**2. Create a Linux App Service Plan**
+```bash
+az appservice plan create --name ServiceHub-Plan --resource-group ServiceHub-RG --sku B1 --is-linux
+```
+
+**3. Deploy the Containerized Application**
+```bash
+# Replace <YOUR_APP_NAME> with a globally unique name
+az webapp create --resource-group ServiceHub-RG --plan ServiceHub-Plan \
+  --name <YOUR_APP_NAME> \
+  --deployment-container-image-name yourdockerhub/servicehub-api:latest
+```
+
+### Environment Variable Configuration
+Azure App Service requires environment variables to be injected via Application Settings. **Do not hardcode secrets in your Docker image.**
+
+```bash
+az webapp config appsettings set --resource-group ServiceHub-RG --name <YOUR_APP_NAME> --settings \
+  DATABASE_URL="postgresql://user:password@ep-your-db.us-east-2.aws.neon.tech/servicehub?sslmode=require" \
+  PORT=3000 \
+  NODE_ENV="production" \
+  JWT_ACCESS_SECRET="your_secure_access_secret" \
+  JWT_REFRESH_SECRET="your_secure_refresh_secret" \
+  WEBSITES_PORT=3000
+```
+*Note: `WEBSITES_PORT=3000` is critical. It instructs Azure App Service to route incoming HTTP traffic to port 3000 inside the Docker container.*
+
+### Verification Steps
+Once the deployment finishes and the container spins up:
+1. Navigate to `https://<YOUR_APP_NAME>.azurewebsites.net/api/v1/health` to verify the application has started and the database connection to Neon PostgreSQL is healthy.
+2. Navigate to `https://<YOUR_APP_NAME>.azurewebsites.net/api-docs` to ensure Swagger UI loads correctly.
+3. Attempt to log in or create a user to verify `JWT` secrets are actively signing tokens.
+
+### Troubleshooting
+- **Container Fails to Start:** Check the container logs using the Azure CLI: `az webapp log tail --name <YOUR_APP_NAME> --resource-group ServiceHub-RG`.
+- **Database Connection Refused:** Verify that your Neon PostgreSQL IP Allowlist is configured to allow Azure IPs, or is open to all IPs (`0.0.0.0/0`) if required. Ensure `sslmode=require` is present in the `DATABASE_URL`.
+- **Prisma Errors:** The Dockerfile automatically runs `npx prisma generate` during the build stage. If Prisma complains about a missing engine, ensure you deployed the multi-stage image.
+
+---
+
+## 24. License
 
 **ISC License**
 
@@ -1188,3 +1368,13 @@ PostgreSQL · Prisma ORM · Express · OpenAPI 3.0.3
 28 tables · 17 enums · 43 endpoints · Production-ready
 
 </div>
+
+---
+
+## 25. Resume Points
+
+- **Architected and implemented a zero-leakage integration testing suite** for a Node.js/PostgreSQL microservices backend using Jest and Supertest, executing 100% of 19 end-to-end critical paths against a completely isolated database schema; enforced strict singleton connection pooling and atomic \TRUNCATE CASCADE\ lifecycle hooks, eliminating flaky tests and guaranteeing state isolation.
+
+- **Containerized the backend using Docker**, creating a reproducible deployment environment with a multi-stage build, optimized layer caching, and a secure non-root runtime isolation suitable for production deployment.
+- **Containerized and deployed a production-grade Node.js backend on Microsoft Azure** using Docker with secure environment-based configuration and external Neon PostgreSQL integration.
+- **Implemented a GitHub Actions CI pipeline** to automate dependency installation, linting, full integration testing within ephemeral PostgreSQL service containers, Prisma client generation, and Docker image validation for zero-regression deployment confidence.

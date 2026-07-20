@@ -1,16 +1,10 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 const AppError = require('../../utils/AppError');
 const { StatusCodes } = require('http-status-codes');
+const { getProviderId } = require('../../utils/provider.util');
 
-const prisma = new PrismaClient();
-
-const getProviderId = async (userId) => {
-  const pp = await prisma.providerProfile.findUnique({ where: { userId }, select: { id: true } });
-  if (!pp) {throw new AppError('Provider profile not found.', StatusCodes.NOT_FOUND);}
-  return pp.id;
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Availability

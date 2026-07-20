@@ -1,10 +1,9 @@
 'use strict';
 
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../config/prisma');
 const AppError = require('../../utils/AppError');
 const { StatusCodes } = require('http-status-codes');
-
-const prisma = new PrismaClient();
+const { getPaginationOptions, formatPaginatedResponse } = require('../../utils/pagination.util');
 
 const getCategories = async () => {
   return prisma.serviceCategory.findMany({
@@ -13,19 +12,28 @@ const getCategories = async () => {
   });
 };
 
-const getServices = async (categoryId) => {
+const getServices = async (categoryId, filters = {}) => {
   const where = { isActive: true };
   if (categoryId) {
     where.categoryId = categoryId;
   }
 
-  return prisma.service.findMany({
-    where,
-    include: {
-      category: { select: { name: true } }
-    },
-    orderBy: { name: 'asc' },
-  });
+  const { page, limit, skip, take } = getPaginationOptions(filters);
+
+  const [data, total] = await Promise.all([
+    prisma.service.findMany({
+      where,
+      include: {
+        category: { select: { name: true } }
+      },
+      orderBy: { id: 'desc' },
+      skip,
+      take,
+    }),
+    prisma.service.count({ where }),
+  ]);
+
+  return formatPaginatedResponse(data, total, page, limit);
 };
 
 const getServiceById = async (serviceId) => {
